@@ -1,10 +1,16 @@
 package com.snc.discovery;
 
-import org.junit.jupiter.api.Test;
+import junit.framework.TestCase;
 
-public class CredentialResolverTest {
-    @Test
-    public void constructorTest() {
-        CredentialResolver testMain = new CredentialResolver();
+import java.util.HashMap;
+
+public class CredentialResolverTest extends TestCase {
+    public void testConstructor() {
+        var testMain = new CredentialResolver();
+    }
+
+    public void testResolve() {
+        var cr = new CredentialResolver();
+        cr.resolve(new HashMap<String, String>());
     }
 }

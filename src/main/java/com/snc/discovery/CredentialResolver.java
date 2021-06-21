@@ -1,7 +1,12 @@
 package com.snc.discovery;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.*;
 import java.util.*;
 import java.io.*;
+import com.google.gson.Gson;
 
 /**
  * Basic implementation of a CredentialResolver that uses a properties file.
@@ -100,6 +105,36 @@ public class CredentialResolver {
 
         if(id.equalsIgnoreCase("misbehave"))
             throw new RuntimeException("I've been a baaaaaaaaad CredentialResolver!");
+
+        // create a client
+        var client = HttpClient.newHttpClient();
+
+        // create a request
+        var request = HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:8200/v1/secret/data/ssh"))
+                .header("accept", "application/json")
+                .header("X-Vault-Request", "true")
+                .header("X-Vault-Token", "root")
+                .build();
+
+        // use the client to send the request
+        HttpResponse<String> response;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch(IOException e) {
+            return null;
+        } catch(InterruptedException e) {
+            return null;
+        }
+        //var j = new JSONObject(response.body());
+        //j.get("foo").
+
+        // the response:
+        System.out.println(response.body());
+
+        Gson gson = new Gson();
+        var secret = gson.fromJson(response.body(), VaultSecret.class);
+        System.out.println(secret.Data());
 
         // the resolved credential is returned in a HashMap...
         Map result = new HashMap();
