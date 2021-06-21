@@ -17,6 +17,12 @@ sourceSets {
 	test.java.srcDir("src/test")
 }
 
+test {
+	// Log enough detail to pinpoint the exact line.
+	testLogging.exceptionFormat = 'full'
+	testLogging.showStandardStreams = true
+}
+
 jar {
 	// Set main class
 	manifest.attributes("Main-Class": "com.snc.discovery.CredentialResolver")

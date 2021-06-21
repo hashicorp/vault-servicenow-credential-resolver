@@ -103,8 +103,8 @@ public class CredentialResolver {
         String type = (String) args.get(ARG_TYPE);
         //String keyPrefix = id+"."+type+".";
 
-        if(id.equalsIgnoreCase("misbehave"))
-            throw new RuntimeException("I've been a baaaaaaaaad CredentialResolver!");
+//        if(id.equalsIgnoreCase("misbehave"))
+//            throw new RuntimeException("I've been a baaaaaaaaad CredentialResolver!");
 
         // create a client
         var client = HttpClient.newHttpClient();
@@ -130,7 +130,7 @@ public class CredentialResolver {
         //j.get("foo").
 
         // the response:
-        System.out.println(response.body());
+        //System.out.println(response.body());
 
         Gson gson = new Gson();
         var secret = gson.fromJson(response.body(), VaultSecret.class);
