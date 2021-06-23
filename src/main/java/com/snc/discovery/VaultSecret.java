@@ -1,19 +1,41 @@
 package com.snc.discovery;
 
-import java.util.Map;
+import com.google.gson.JsonObject;
 
 class VaultSecret {
     private String requestID;
     private String leaseID;
     private Integer leaseDuration;
-    private Boolean Renewable;
-    private Map<String, Object> data;
+    private Boolean renewable;
+    private JsonObject data;
     private String[] warnings;
     // Auth
     // WrapInfo
-    VaultSecret() {}
 
-    public Map<String, Object> Data() {
+    public String getRequestID() {
+        return requestID;
+    }
+
+    public String getLeaseID() {
+        return leaseID;
+    }
+
+    public Integer getLeaseDuration() {
+        return leaseDuration;
+    }
+
+    public Boolean getRenewable() {
+        return renewable;
+    }
+
+    public JsonObject getData() {
         return data;
+    }
+
+    public String[] getWarnings() {
+        return warnings;
+    }
+
+    VaultSecret() {
     }
 }
