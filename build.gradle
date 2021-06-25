@@ -8,11 +8,10 @@ repositories {
 dependencies {
 	// https://mvnrepository.com/artifact/com.google.code.gson/gson
 	implementation group: "com.google.code.gson", name: "gson", version: "2.8.7"
-	implementation files("mid.jar")
+	implementation fileTree(dir: 'libs', include: ['*.jar'])
 	// https://mvnrepository.com/artifact/junit/junit
 	testImplementation group: "junit", name: "junit", version: "4.13.2"
 	testImplementation group: "com.github.tomakehurst", name: "wiremock-jre8", version: "2.28.1"
-	testImplementation files("mid.jar")
 }
 
 sourceSets {
