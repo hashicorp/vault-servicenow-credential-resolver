@@ -9,8 +9,8 @@ class VaultSecret {
     private Boolean renewable;
     private JsonObject data;
     private String[] warnings;
-    // Auth
-    // WrapInfo
+    // Auth omitted
+    // WrapInfo omitted
 
     public String getRequestID() {
         return requestID;

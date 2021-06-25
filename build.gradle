@@ -1,4 +1,4 @@
-apply plugin: 'java'
+apply plugin: "java"
 
 repositories {
 	// Use Maven Central for resolving dependencies.
@@ -7,26 +7,28 @@ repositories {
 
 dependencies {
 	// https://mvnrepository.com/artifact/com.google.code.gson/gson
-	implementation group: 'com.google.code.gson', name: 'gson', version: '2.8.7'
-	implementation files('mid.jar')
+	implementation group: "com.google.code.gson", name: "gson", version: "2.8.7"
+	implementation files("mid.jar")
 	// https://mvnrepository.com/artifact/junit/junit
-	testImplementation group: 'junit', name: 'junit', version: '4.13.2'
+	testImplementation group: "junit", name: "junit", version: "4.13.2"
+	testImplementation group: "com.github.tomakehurst", name: "wiremock-jre8", version: "2.28.1"
+	testImplementation files("mid.jar")
 }
 
 sourceSets {
-	main.java.srcDir('src/main')
-	test.java.srcDir('src/test')
+	main.java.srcDir("src/main")
+	test.java.srcDir("src/test")
 }
 
 test {
 	// Log enough detail to pinpoint the exact line.
-	testLogging.exceptionFormat = 'full'
+	testLogging.exceptionFormat = "full"
 	testLogging.showStandardStreams = true
 }
 
 jar {
 	// Set main class
-	manifest.attributes('Main-Class': 'com.snc.discovery.CredentialResolver')
+	manifest.attributes("Main-Class": "com.snc.discovery.CredentialResolver")
 	// Include runtime dependencies in .jar
 	from {configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
 }

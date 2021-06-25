@@ -1,17 +1,26 @@
 package com.snc.discovery;
 
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.URI;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
 import com.google.gson.Gson;
+import com.service_now.mid.services.Config;
 
 public class CredentialResolver {
-    private final HttpClient httpClient;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final Function<String, String> getProperty;
 
     public CredentialResolver() {
-        httpClient = HttpClient.newHttpClient();
+        getProperty = prop -> Config.get().getProperty(prop);
+    }
+
+    public CredentialResolver(Function<String, String> getProperty) {
+        this.getProperty = getProperty;
     }
 
     // Populated keys on resolve's input `Map args`
@@ -30,11 +39,11 @@ public class CredentialResolver {
      * Resolve a credential.
      */
     public Map resolve(Map args) {
-        //Config.get().getProperty()
+        var vaultAddress = getProperty.apply("mid.external_credentials.vault.address");
         String id = (String) args.get(ARG_ID);
 
         var request = HttpRequest.newBuilder()
-                .uri(URI.create("http://127.0.0.1:8300/v1/" + id))
+                .uri(URI.create(vaultAddress + "/v1/" + id))
                 .header("accept", "application/json")
                 .header("X-Vault-Request", "true")
                 .build();
@@ -46,8 +55,14 @@ public class CredentialResolver {
             throw new RuntimeException("Failed to query Vault for secret with credential ID: " + id, e);
         }
 
+        System.err.println("Successfully queried Vault for credential id: "+id);
+
+        return extractKeys(response.body());
+    }
+
+    public Map<String, String> extractKeys(String vaultResponse) {
         Gson gson = new Gson();
-        var secret = gson.fromJson(response.body(), VaultSecret.class);
+        var secret = gson.fromJson(vaultResponse, VaultSecret.class);
         var data = secret.getData();
 
         // Check for embedded "data" field to handle kv-v2.
@@ -87,11 +102,8 @@ public class CredentialResolver {
             result.put(VAL_PASSPHRASE, passphrase.getAsString());
         }
 
-        System.err.println("Queried Vault for credential id: "+id);
-
         return result;
     }
-
 
     /**
      * Return the API version supported by this class.
