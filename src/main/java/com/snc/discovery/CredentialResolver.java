@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.function.Function;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
 import com.service_now.mid.services.Config;
 
 public class CredentialResolver {
@@ -65,8 +67,12 @@ public class CredentialResolver {
         var secret = gson.fromJson(vaultResponse, VaultSecret.class);
         var data = secret.getData();
 
-        // Check for embedded "data" field to handle kv-v2.
-        if (data.get("data") != null) {
+        if (data == null) {
+            throw new RuntimeException("No data found in Vault secret");
+        }
+
+        // Check for embedded "data" object to handle kv-v2.
+        if (data.has("data")) {
             try {
                 data = data.get("data").getAsJsonObject();
             } catch (IllegalStateException e) {
@@ -74,35 +80,55 @@ public class CredentialResolver {
             }
         }
 
-        var username = data.get("username");
-        if (data.has("access_key")) {
-            username = data.get("access_key");
-        }
-        var password = data.get("password");
-        if (data.has("current_password")) {
-            password = data.get("current_password");
-        }
-        if (data.has("secret_key")) {
-            password = data.get("secret_key");
-        }
-        var passphrase = data.get("passphrase");
-        var privateKey = data.get("private_key");
+        // access_key for AWS secret engine
+        var username = keyAndSourceFromData(data, "access_key", "username");
+        // secret_key for AWS secret engine, current_password for AD secret engine
+        var password = keyAndSourceFromData(data, "secret_key", "current_password", "password");
+        var privateKey = keyAndSourceFromData(data, "private_key");
+        var passphrase = keyAndSourceFromData(data, "passphrase");
 
+        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s%n",
+                VAL_USER, username.source,
+                VAL_PSWD, password.source,
+                VAL_PKEY, privateKey.source,
+                VAL_PASSPHRASE, passphrase.source);
         var result = new HashMap<String, String>();
-        if (username != null) {
-            result.put(VAL_USER, username.getAsString());
+        if (username.key != null) {
+            result.put(VAL_USER, username.key);
         }
-        if (password != null) {
-            result.put(VAL_PSWD, password.getAsString());
+        if (password.key != null) {
+            result.put(VAL_PSWD, password.key);
         }
-        if (privateKey != null) {
-            result.put(VAL_PKEY, privateKey.getAsString());
+        if (privateKey.key != null) {
+            result.put(VAL_PKEY, privateKey.key);
         }
-        if (passphrase != null) {
-            result.put(VAL_PASSPHRASE, passphrase.getAsString());
+        if (passphrase.key != null) {
+            result.put(VAL_PASSPHRASE, passphrase.key);
         }
 
         return result;
+    }
+
+    // Metadata class to help report which fields keys were extracted from.
+    private static class KeyAndSource {
+        private final String key;
+        private final String source;
+
+        KeyAndSource(String key, String source) {
+            this.key = key;
+            this.source = source;
+        }
+    }
+
+    // The first key that exists in data will be extracted and returned.
+    private KeyAndSource keyAndSourceFromData(JsonObject data, String ...keys) {
+        for (String key : keys) {
+            if (data.has(key)) {
+                return new KeyAndSource(data.get(key).getAsString(), key);
+            }
+        }
+
+        return new KeyAndSource(null, null);
     }
 
     /**
