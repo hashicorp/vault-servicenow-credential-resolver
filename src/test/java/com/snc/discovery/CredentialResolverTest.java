@@ -1,21 +1,25 @@
 package com.snc.discovery;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.function.ThrowingRunnable;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
-
-import java.util.HashMap;
-import java.util.Map;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.ok;
+import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 
 public class CredentialResolverTest {
     @Rule
     public WireMockRule wireMockRule = new WireMockRule();
 
-    private Map setupAndResolve(String path, String json) {
+    private Map setupAndResolve(String path, String json) throws IOException {
         stubFor(get("/v1/" + path)
             .withHeader("accept", containing("application/json"))
             .willReturn(ok()
@@ -45,7 +49,7 @@ public class CredentialResolverTest {
     }
 
     @Test
-    public void testResolveKvV2() {
+    public void testResolveKvV2() throws IOException {
         var result = setupAndResolve("secret/data/ssh", "{'data':{'data':{'username':'ssh-user','private_key':'my_very_private_key'}}}");
 
         Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
@@ -54,7 +58,7 @@ public class CredentialResolverTest {
     }
 
     @Test
-    public void testResolveBasic() {
+    public void testResolveBasic() throws IOException {
         var result = setupAndResolve("kv/user", "{'data':{'username':'my-user','password':'my-password'}}");
 
         Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
@@ -63,7 +67,7 @@ public class CredentialResolverTest {
     }
 
     @Test
-    public void testResolveSshWithPasswordAndPassphrase() {
+    public void testResolveSshWithPasswordAndPassphrase() throws IOException {
         var result = setupAndResolve("kv/ssh-with-passphrase", "{'data':{'username':'ssh-user','password':'ssh-password','private_key':'ssh-private-key','passphrase':'ssh-passphrase'}}");
 
         Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
@@ -74,7 +78,7 @@ public class CredentialResolverTest {
     }
 
     @Test
-    public void testResolveActiveDirectoryFields() {
+    public void testResolveActiveDirectoryFields() throws IOException {
         var result = setupAndResolve("ad/ad-user", "{'data':{'username':'my-user','password':'my-password','current_password':'my-current-password'}}");
 
         Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
@@ -83,7 +87,7 @@ public class CredentialResolverTest {
     }
 
     @Test
-    public void testResolveAwsFields() {
+    public void testResolveAwsFields() throws IOException {
         var result = setupAndResolve("aws/aws-user", "{'data':{'username':'aws-user','password':'aws-password','current_password':'aws-current-password','access_key':'aws-access-key','secret_key':'aws-secret-key'}}");
 
         Assert.assertEquals("aws-access-key", result.get(CredentialResolver.VAL_USER));

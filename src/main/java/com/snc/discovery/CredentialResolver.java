@@ -1,11 +1,10 @@
 package com.snc.discovery;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.function.Function;
 
 import com.google.gson.Gson;
@@ -13,8 +12,12 @@ import com.google.gson.JsonObject;
 
 import com.service_now.mid.services.Config;
 
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+
 public class CredentialResolver {
-    private final HttpClient httpClient = HttpClient.newHttpClient();
     private final Function<String, String> getProperty;
 
     public CredentialResolver() {
@@ -40,32 +43,45 @@ public class CredentialResolver {
     /**
      * Resolve a credential.
      */
-    public Map resolve(Map args) {
-        var vaultAddress = getProperty.apply("mid.external_credentials.vault.address");
+    public Map resolve(Map args) throws IOException {
+        String vaultAddress = getProperty.apply("mid.external_credentials.vault.address");
         String id = (String) args.get(ARG_ID);
 
-        var request = HttpRequest.newBuilder()
-                .uri(URI.create(vaultAddress + "/v1/" + id))
-                .header("accept", "application/json")
-                .header("X-Vault-Request", "true")
-                .build();
+        String body;
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet get = new HttpGet(vaultAddress + "/v1/" + id);
+            get.setHeader("accept", "application/json");
+            get.setHeader("X-Vault-Request", "true");
+            try (CloseableHttpResponse response = httpClient.execute(get)) {
+                Scanner s = new Scanner(response.getEntity().getContent()).useDelimiter("\\A");
+                body = s.hasNext() ? s.next() : "";
 
-        HttpResponse<String> response;
-        try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch(Exception e) {
-            throw new RuntimeException("Failed to query Vault for secret with credential ID: " + id, e);
+                int status = response.getStatusLine().getStatusCode();
+                if (status < 200 || status > 299) {
+                    String message = String.format("Failed to query Vault for credential id: %s. Status code %d.", id, status);
+                    Gson gson = new Gson();
+                    VaultError error = gson.fromJson(body, VaultError.class);
+                    if (error != null) {
+                        message += " Errors: " + Arrays.toString(error.errors);
+                    }
+
+                    throw new RuntimeException(message);
+                }
+            }
         }
 
         System.err.println("Successfully queried Vault for credential id: "+id);
 
-        return extractKeys(response.body());
+        Map<String, String> result = extractKeys(body);
+        CredentialType type = lookupByName((String) args.get(ARG_TYPE));
+        validateResult(result, type);
+        return result;
     }
 
-    public Map<String, String> extractKeys(String vaultResponse) {
+    private Map<String, String> extractKeys(String vaultResponse) {
         Gson gson = new Gson();
-        var secret = gson.fromJson(vaultResponse, VaultSecret.class);
-        var data = secret.getData();
+        VaultSecret secret = gson.fromJson(vaultResponse, VaultSecret.class);
+        JsonObject data = secret.getData();
 
         if (data == null) {
             throw new RuntimeException("No data found in Vault secret");
@@ -81,18 +97,18 @@ public class CredentialResolver {
         }
 
         // access_key for AWS secret engine
-        var username = keyAndSourceFromData(data, "access_key", "username");
+        KeyAndSource username = keyAndSourceFromData(data, "access_key", "username");
         // secret_key for AWS secret engine, current_password for AD secret engine
-        var password = keyAndSourceFromData(data, "secret_key", "current_password", "password");
-        var privateKey = keyAndSourceFromData(data, "private_key");
-        var passphrase = keyAndSourceFromData(data, "passphrase");
+        KeyAndSource password = keyAndSourceFromData(data, "secret_key", "current_password", "password");
+        KeyAndSource privateKey = keyAndSourceFromData(data, "private_key");
+        KeyAndSource passphrase = keyAndSourceFromData(data, "passphrase");
 
         System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s%n",
                 VAL_USER, username.source,
                 VAL_PSWD, password.source,
                 VAL_PKEY, privateKey.source,
                 VAL_PASSPHRASE, passphrase.source);
-        var result = new HashMap<String, String>();
+        HashMap<String, String> result = new HashMap<String, String>();
         if (username.key != null) {
             result.put(VAL_USER, username.key);
         }
@@ -107,6 +123,75 @@ public class CredentialResolver {
         }
 
         return result;
+    }
+
+    public void validateResult(Map<String, String> result, CredentialType type) {
+        if (result.size() == 0) {
+            throw new RuntimeException("No fields to extract from Vault secret");
+        }
+
+        if (type == null) {
+            return;
+        }
+
+        switch (type) {
+            case basic:
+            case windows:
+            case ssh_password:
+            case vmware:
+            case jdbc:
+            case jms:
+            case aws:
+                if (!result.containsKey(VAL_USER)) {
+                    throw new RuntimeException(String.format("Expected 'user' field for credential type %s", type.name()));
+                }
+                if (!result.containsKey(VAL_PSWD)) {
+                    throw new RuntimeException(String.format("Expected 'pswd' field for credential type %s", type.name()));
+                }
+                break;
+            case ssh_private_key:
+            case sn_cfg_ansible:
+            case sn_disco_certmgmt_certificate_ca:
+            case cfg_chef_credentials:
+            case infoblox:
+            case api_key:
+                if (!result.containsKey(VAL_USER)) {
+                    throw new RuntimeException(String.format("Expected 'user' field for credential type %s", type.name()));
+                }
+                if (!result.containsKey(VAL_PKEY)) {
+                    throw new RuntimeException(String.format("Expected 'pkey' field for credential type %s", type.name()));
+                }
+                break;
+            default:
+                // Unhandled type, do not perform any validation on specific fields.
+                break;
+        }
+    }
+
+    private static final Map<String, CredentialType> nameIndex = new HashMap<>();
+    static {
+        for (CredentialType type : CredentialType.values()) {
+            nameIndex.put(type.name(), type);
+        }
+    }
+    private static CredentialType lookupByName(String name) {
+        return nameIndex.get(name);
+    }
+
+    enum CredentialType {
+        basic,
+        windows,
+        ssh_password,
+        vmware,
+        jdbc,
+        jms,
+        aws,
+        ssh_private_key,
+        sn_cfg_ansible,
+        sn_disco_certmgmt_certificate_ca,
+        cfg_chef_credentials,
+        infoblox,
+        api_key,
     }
 
     // Metadata class to help report which fields keys were extracted from.
@@ -131,14 +216,49 @@ public class CredentialResolver {
         return new KeyAndSource(null, null);
     }
 
-    /**
-     * Return the API version supported by this class.
-     */
-    public String getVersion() {
-        return "1.0";
+    private static class VaultSecret {
+        private String requestID;
+        private String leaseID;
+        private Integer leaseDuration;
+        private Boolean renewable;
+        private JsonObject data;
+        private String[] warnings;
+        // Auth omitted
+        // WrapInfo omitted
+
+        public String getRequestID() {
+            return requestID;
+        }
+
+        public String getLeaseID() {
+            return leaseID;
+        }
+
+        public Integer getLeaseDuration() {
+            return leaseDuration;
+        }
+
+        public Boolean getRenewable() {
+            return renewable;
+        }
+
+        public JsonObject getData() {
+            return data;
+        }
+
+        public String[] getWarnings() {
+            return warnings;
+        }
+
+        VaultSecret() {
+        }
     }
 
-    public static void main(String[] args) {
-        CredentialResolver obj = new CredentialResolver();
+    private static class VaultError {
+        private String[] errors;
+
+        public String[] getErrors() {
+            return errors;
+        }
     }
 }
