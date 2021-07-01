@@ -78,6 +78,13 @@ public class CredentialResolver {
         return result;
     }
 
+    /**
+     * Return the ServiceNow API version supported by this class.
+     */
+    public String getVersion() {
+        return "1.0";
+    }
+
     private Map<String, String> extractKeys(String vaultResponse) {
         Gson gson = new Gson();
         VaultSecret secret = gson.fromJson(vaultResponse, VaultSecret.class);
