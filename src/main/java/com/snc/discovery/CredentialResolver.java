@@ -104,11 +104,11 @@ public class CredentialResolver {
         }
 
         // access_key for AWS secret engine
-        KeyAndSource username = keyAndSourceFromData(data, "access_key", "username");
+        ValueAndSource username = valueAndSourceFromData(data, "access_key", "username");
         // secret_key for AWS secret engine, current_password for AD secret engine
-        KeyAndSource password = keyAndSourceFromData(data, "secret_key", "current_password", "password");
-        KeyAndSource privateKey = keyAndSourceFromData(data, "private_key");
-        KeyAndSource passphrase = keyAndSourceFromData(data, "passphrase");
+        ValueAndSource password = valueAndSourceFromData(data, "secret_key", "current_password", "password");
+        ValueAndSource privateKey = valueAndSourceFromData(data, "private_key");
+        ValueAndSource passphrase = valueAndSourceFromData(data, "passphrase");
 
         System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s%n",
                 VAL_USER, username.source,
@@ -116,17 +116,17 @@ public class CredentialResolver {
                 VAL_PKEY, privateKey.source,
                 VAL_PASSPHRASE, passphrase.source);
         HashMap<String, String> result = new HashMap<>();
-        if (username.key != null) {
-            result.put(VAL_USER, username.key);
+        if (username.value != null) {
+            result.put(VAL_USER, username.value);
         }
-        if (password.key != null) {
-            result.put(VAL_PSWD, password.key);
+        if (password.value != null) {
+            result.put(VAL_PSWD, password.value);
         }
-        if (privateKey.key != null) {
-            result.put(VAL_PKEY, privateKey.key);
+        if (privateKey.value != null) {
+            result.put(VAL_PKEY, privateKey.value);
         }
-        if (passphrase.key != null) {
-            result.put(VAL_PASSPHRASE, passphrase.key);
+        if (passphrase.value != null) {
+            result.put(VAL_PASSPHRASE, passphrase.value);
         }
 
         return result;
@@ -185,25 +185,25 @@ public class CredentialResolver {
     }
 
     // Metadata class to help report which fields keys were extracted from.
-    private static class KeyAndSource {
-        private final String key;
+    private static class ValueAndSource {
+        private final String value;
         private final String source;
 
-        KeyAndSource(String key, String source) {
-            this.key = key;
+        ValueAndSource(String value, String source) {
+            this.value = value;
             this.source = source;
         }
     }
 
     // The first key that exists in data will be extracted and returned.
-    private KeyAndSource keyAndSourceFromData(JsonObject data, String ...keys) {
+    private ValueAndSource valueAndSourceFromData(JsonObject data, String ...keys) {
         for (String key : keys) {
             if (data.has(key)) {
-                return new KeyAndSource(data.get(key).getAsString(), key);
+                return new ValueAndSource(data.get(key).getAsString(), key);
             }
         }
 
-        return new KeyAndSource(null, null);
+        return new ValueAndSource(null, null);
     }
 
     private static class VaultSecret {
