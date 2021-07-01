@@ -108,7 +108,7 @@ public class CredentialResolver {
                 VAL_PSWD, password.source,
                 VAL_PKEY, privateKey.source,
                 VAL_PASSPHRASE, passphrase.source);
-        HashMap<String, String> result = new HashMap<String, String>();
+        HashMap<String, String> result = new HashMap<>();
         if (username.key != null) {
             result.put(VAL_USER, username.key);
         }
@@ -134,41 +134,14 @@ public class CredentialResolver {
             return;
         }
 
-        switch (type) {
-            case basic:
-            case windows:
-            case ssh_password:
-            case vmware:
-            case jdbc:
-            case jms:
-            case aws:
-                if (!result.containsKey(VAL_USER)) {
-                    throw new RuntimeException(String.format("Expected 'user' field for credential type %s", type.name()));
-                }
-                if (!result.containsKey(VAL_PSWD)) {
-                    throw new RuntimeException(String.format("Expected 'pswd' field for credential type %s", type.name()));
-                }
-                break;
-            case ssh_private_key:
-            case sn_cfg_ansible:
-            case sn_disco_certmgmt_certificate_ca:
-            case cfg_chef_credentials:
-            case infoblox:
-            case api_key:
-                if (!result.containsKey(VAL_USER)) {
-                    throw new RuntimeException(String.format("Expected 'user' field for credential type %s", type.name()));
-                }
-                if (!result.containsKey(VAL_PKEY)) {
-                    throw new RuntimeException(String.format("Expected 'pkey' field for credential type %s", type.name()));
-                }
-                break;
-            default:
-                // Unhandled type, do not perform any validation on specific fields.
-                break;
+        for (String expected : type.expectedFields()) {
+            if (!result.containsKey(expected)) {
+                throw new RuntimeException(String.format("Expected '%s' field for credential type %s", expected, type.name()));
+            }
         }
     }
 
-    private static final Map<String, CredentialType> nameIndex = new HashMap<>();
+    private static final Map<String, CredentialType> nameIndex = new HashMap<>(CredentialType.values().length);
     static {
         for (CredentialType type : CredentialType.values()) {
             nameIndex.put(type.name(), type);
@@ -179,19 +152,29 @@ public class CredentialResolver {
     }
 
     enum CredentialType {
-        basic,
-        windows,
-        ssh_password,
-        vmware,
-        jdbc,
-        jms,
-        aws,
-        ssh_private_key,
-        sn_cfg_ansible,
-        sn_disco_certmgmt_certificate_ca,
-        cfg_chef_credentials,
-        infoblox,
-        api_key,
+        basic                               (new String[]{VAL_USER, VAL_PSWD}),
+        windows                             (new String[]{VAL_USER, VAL_PSWD}),
+        ssh_password                        (new String[]{VAL_USER, VAL_PSWD}),
+        vmware                              (new String[]{VAL_USER, VAL_PSWD}),
+        jdbc                                (new String[]{VAL_USER, VAL_PSWD}),
+        jms                                 (new String[]{VAL_USER, VAL_PSWD}),
+        aws                                 (new String[]{VAL_USER, VAL_PSWD}),
+        ssh_private_key                     (new String[]{VAL_USER, VAL_PKEY}),
+        sn_cfg_ansible                      (new String[]{VAL_USER, VAL_PKEY}),
+        sn_disco_certmgmt_certificate_ca    (new String[]{VAL_USER, VAL_PKEY}),
+        cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),
+        infoblox                            (new String[]{VAL_USER, VAL_PKEY}),
+        api_key                             (new String[]{VAL_USER, VAL_PKEY});
+
+        private final String[] expectedFields;
+
+        CredentialType(String[] expectedFields) {
+            this.expectedFields = expectedFields;
+        }
+
+        public String[] expectedFields() {
+            return expectedFields;
+        }
     }
 
     // Metadata class to help report which fields keys were extracted from.

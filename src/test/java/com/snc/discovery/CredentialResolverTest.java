@@ -94,4 +94,49 @@ public class CredentialResolverTest {
         Assert.assertEquals("aws-secret-key", result.get(CredentialResolver.VAL_PSWD));
         Assert.assertEquals(2, result.size());
     }
+
+    @Test
+    public void testValidateResultFullyPopulated() {
+        var cr = new CredentialResolver(prop -> "");
+        var input = new HashMap<String, String>();
+        input.put(CredentialResolver.VAL_USER, "");
+        input.put(CredentialResolver.VAL_PSWD, "");
+        input.put(CredentialResolver.VAL_PKEY, "");
+        input.put(CredentialResolver.VAL_PASSPHRASE, "");
+        for (var type : CredentialResolver.CredentialType.values()) {
+            // No validation errors expected
+            cr.validateResult(input, type);
+        }
+
+        cr.validateResult(input, null);
+    }
+
+    @Test
+    public void testValidateResultEmpty() {
+        var cr = new CredentialResolver(prop -> "");
+        var input = new HashMap<String, String>();
+        for (var type : CredentialResolver.CredentialType.values()) {
+            // All types should error for empty input
+            Assert.assertThrows(RuntimeException.class, () -> cr.validateResult(input, type));
+        }
+
+        // null type only validates non-empty
+        Assert.assertThrows(RuntimeException.class, () -> cr.validateResult(input, null));
+        input.put("FOO_KEY", "");
+        // Now that there is some data in the input, no further validation should take place.
+        cr.validateResult(input, null);
+    }
+
+    @Test
+    public void testValidateResultMinimallyPopulated() {
+        var cr = new CredentialResolver(prop -> "");
+        for (var type : CredentialResolver.CredentialType.values()) {
+            var input = new HashMap<String, String>();
+            for (var expected : type.expectedFields()) {
+                input.put(expected, "");
+            }
+            // No validation errors expected
+            cr.validateResult(input, type);
+        }
+    }
 }
