@@ -26,8 +26,8 @@ public class CredentialResolverTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody(json)));
 
-        var cr = new CredentialResolver(prop -> "http://localhost:8080");
-        var input = new HashMap<String, String>();
+        CredentialResolver cr = new CredentialResolver(prop -> "http://localhost:8080");
+        HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, path);
         return cr.resolve(input);
     }
@@ -40,17 +40,17 @@ public class CredentialResolverTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{}")));
 
-        var cr = new CredentialResolver(prop -> "http://localhost:8080");
-        var input = new HashMap<String, String>();
+        CredentialResolver cr = new CredentialResolver(prop -> "http://localhost:8080");
+        HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "degenerate");
 
-        var exception = Assert.assertThrows(RuntimeException.class, () -> cr.resolve(input));
+        Exception exception = Assert.assertThrows(RuntimeException.class, () -> cr.resolve(input));
         Assert.assertTrue(exception.getMessage().contains("No data found"));
     }
 
     @Test
     public void testResolveKvV2() throws IOException {
-        var result = setupAndResolve("secret/data/ssh", "{'data':{'data':{'username':'ssh-user','private_key':'my_very_private_key'}}}");
+        Map result = setupAndResolve("secret/data/ssh", "{'data':{'data':{'username':'ssh-user','private_key':'my_very_private_key'}}}");
 
         Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
         Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
@@ -59,7 +59,7 @@ public class CredentialResolverTest {
 
     @Test
     public void testResolveBasic() throws IOException {
-        var result = setupAndResolve("kv/user", "{'data':{'username':'my-user','password':'my-password'}}");
+        Map result = setupAndResolve("kv/user", "{'data':{'username':'my-user','password':'my-password'}}");
 
         Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
         Assert.assertEquals("my-password", result.get(CredentialResolver.VAL_PSWD));
@@ -68,7 +68,7 @@ public class CredentialResolverTest {
 
     @Test
     public void testResolveSshWithPasswordAndPassphrase() throws IOException {
-        var result = setupAndResolve("kv/ssh-with-passphrase", "{'data':{'username':'ssh-user','password':'ssh-password','private_key':'ssh-private-key','passphrase':'ssh-passphrase'}}");
+        Map result = setupAndResolve("kv/ssh-with-passphrase", "{'data':{'username':'ssh-user','password':'ssh-password','private_key':'ssh-private-key','passphrase':'ssh-passphrase'}}");
 
         Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
         Assert.assertEquals("ssh-password", result.get(CredentialResolver.VAL_PSWD));
@@ -79,7 +79,7 @@ public class CredentialResolverTest {
 
     @Test
     public void testResolveActiveDirectoryFields() throws IOException {
-        var result = setupAndResolve("ad/ad-user", "{'data':{'username':'my-user','password':'my-password','current_password':'my-current-password'}}");
+        Map result = setupAndResolve("ad/ad-user", "{'data':{'username':'my-user','password':'my-password','current_password':'my-current-password'}}");
 
         Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
         Assert.assertEquals("my-current-password", result.get(CredentialResolver.VAL_PSWD));
@@ -88,7 +88,7 @@ public class CredentialResolverTest {
 
     @Test
     public void testResolveAwsFields() throws IOException {
-        var result = setupAndResolve("aws/aws-user", "{'data':{'username':'aws-user','password':'aws-password','current_password':'aws-current-password','access_key':'aws-access-key','secret_key':'aws-secret-key'}}");
+        Map result = setupAndResolve("aws/aws-user", "{'data':{'username':'aws-user','password':'aws-password','current_password':'aws-current-password','access_key':'aws-access-key','secret_key':'aws-secret-key'}}");
 
         Assert.assertEquals("aws-access-key", result.get(CredentialResolver.VAL_USER));
         Assert.assertEquals("aws-secret-key", result.get(CredentialResolver.VAL_PSWD));
@@ -97,13 +97,13 @@ public class CredentialResolverTest {
 
     @Test
     public void testValidateResultFullyPopulated() {
-        var cr = new CredentialResolver(prop -> "");
-        var input = new HashMap<String, String>();
+        CredentialResolver cr = new CredentialResolver(prop -> "");
+        HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.VAL_USER, "");
         input.put(CredentialResolver.VAL_PSWD, "");
         input.put(CredentialResolver.VAL_PKEY, "");
         input.put(CredentialResolver.VAL_PASSPHRASE, "");
-        for (var type : CredentialResolver.CredentialType.values()) {
+        for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
             // No validation errors expected
             cr.validateResult(input, type);
         }
@@ -113,9 +113,9 @@ public class CredentialResolverTest {
 
     @Test
     public void testValidateResultEmpty() {
-        var cr = new CredentialResolver(prop -> "");
-        var input = new HashMap<String, String>();
-        for (var type : CredentialResolver.CredentialType.values()) {
+        CredentialResolver cr = new CredentialResolver(prop -> "");
+        HashMap<String, String> input = new HashMap<>();
+        for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
             // All types should error for empty input
             Assert.assertThrows(RuntimeException.class, () -> cr.validateResult(input, type));
         }
@@ -129,10 +129,10 @@ public class CredentialResolverTest {
 
     @Test
     public void testValidateResultMinimallyPopulated() {
-        var cr = new CredentialResolver(prop -> "");
-        for (var type : CredentialResolver.CredentialType.values()) {
-            var input = new HashMap<String, String>();
-            for (var expected : type.expectedFields()) {
+        CredentialResolver cr = new CredentialResolver(prop -> "");
+        for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
+            HashMap<String, String> input = new HashMap<>();
+            for (String expected : type.expectedFields()) {
                 input.put(expected, "");
             }
             // No validation errors expected

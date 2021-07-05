@@ -60,9 +60,14 @@ public class CredentialResolver {
                 if (status < 200 || status > 299) {
                     String message = String.format("Failed to query Vault for credential id: %s. Status code %d.", id, status);
                     Gson gson = new Gson();
-                    VaultError error = gson.fromJson(body, VaultError.class);
-                    if (error != null) {
-                        message += " Errors: " + Arrays.toString(error.errors);
+                    VaultResponse json = gson.fromJson(body, VaultResponse.class);
+                    if (json != null) {
+                        if (json.getErrors() != null) {
+                            message += String.format(" Errors: %s.", Arrays.toString(json.getErrors()));
+                        }
+                        if (json.getWarnings() != null) {
+                            message += String.format(" Warnings: %s.", Arrays.toString(json.getWarnings()));
+                        }
                     }
 
                     throw new RuntimeException(message);
@@ -87,7 +92,7 @@ public class CredentialResolver {
 
     private Map<String, String> extractKeys(String vaultResponse) {
         Gson gson = new Gson();
-        VaultSecret secret = gson.fromJson(vaultResponse, VaultSecret.class);
+        VaultResponse secret = gson.fromJson(vaultResponse, VaultResponse.class);
         JsonObject data = secret.getData();
 
         if (data == null) {
@@ -204,51 +209,5 @@ public class CredentialResolver {
         }
 
         return new ValueAndSource(null, null);
-    }
-
-    private static class VaultSecret {
-        private String requestID;
-        private String leaseID;
-        private Integer leaseDuration;
-        private Boolean renewable;
-        private JsonObject data;
-        private String[] warnings;
-        // Auth omitted
-        // WrapInfo omitted
-
-        public String getRequestID() {
-            return requestID;
-        }
-
-        public String getLeaseID() {
-            return leaseID;
-        }
-
-        public Integer getLeaseDuration() {
-            return leaseDuration;
-        }
-
-        public Boolean getRenewable() {
-            return renewable;
-        }
-
-        public JsonObject getData() {
-            return data;
-        }
-
-        public String[] getWarnings() {
-            return warnings;
-        }
-
-        VaultSecret() {
-        }
-    }
-
-    private static class VaultError {
-        private String[] errors;
-
-        public String[] getErrors() {
-            return errors;
-        }
     }
 }
