@@ -1,21 +1,20 @@
 package com.snc.discovery;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.service_now.mid.services.Config;
+import org.apache.http.client.HttpResponseException;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.function.Function;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-
-import com.service_now.mid.services.Config;
-
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 
 public class CredentialResolver {
     private final Function<String, String> getProperty;
@@ -58,19 +57,21 @@ public class CredentialResolver {
 
                 int status = response.getStatusLine().getStatusCode();
                 if (status < 200 || status > 299) {
-                    String message = String.format("Failed to query Vault for credential id: %s. Status code %d.", id, status);
+                    String message = String.format("Failed to query Vault for credential id: %s.", id);
                     Gson gson = new Gson();
-                    VaultResponse json = gson.fromJson(body, VaultResponse.class);
+                    VaultError json = gson.fromJson(body, VaultError.class);
                     if (json != null) {
-                        if (json.getErrors() != null) {
-                            message += String.format(" Errors: %s.", Arrays.toString(json.getErrors()));
+                        final String[] errors = json.getErrors();
+                        if (errors != null && errors.length > 0) {
+                            message += String.format(" Errors: %s.", Arrays.toString(errors));
                         }
-                        if (json.getWarnings() != null) {
-                            message += String.format(" Warnings: %s.", Arrays.toString(json.getWarnings()));
+                        final String[] warnings = json.getWarnings();
+                        if (warnings != null && warnings.length > 0) {
+                            message += String.format(" Warnings: %s.", Arrays.toString(warnings));
                         }
                     }
 
-                    throw new RuntimeException(message);
+                    throw new HttpResponseException(status, message);
                 }
             }
         }
@@ -92,7 +93,7 @@ public class CredentialResolver {
 
     private Map<String, String> extractKeys(String vaultResponse) {
         Gson gson = new Gson();
-        VaultResponse secret = gson.fromJson(vaultResponse, VaultResponse.class);
+        VaultSecret secret = gson.fromJson(vaultResponse, VaultSecret.class);
         JsonObject data = secret.getData();
 
         if (data == null) {

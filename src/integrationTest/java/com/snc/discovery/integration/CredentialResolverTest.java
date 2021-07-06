@@ -3,6 +3,7 @@ package com.snc.discovery.integration;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.snc.discovery.CredentialResolver;
+import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
@@ -22,6 +23,7 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.regex.Pattern;
 
 import static org.junit.Assert.*;
 
@@ -84,6 +86,37 @@ public class CredentialResolverTest {
         Map result = cr.resolve(input);
         assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
         assertEquals("foo", result.get(CredentialResolver.VAL_PKEY));
+    }
+
+    @Test
+    public void testQueryVaultDirectlyFails() {
+        CredentialResolver cr = new CredentialResolver(prop -> vault.getAddress());
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "400.*errors.*missing client token");
+    }
+
+    @Test
+    public void test404() {
+        CredentialResolver cr = new CredentialResolver(prop -> agent.getAddress());
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/not-there");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "404");
+    }
+
+    @Test
+    public void testBadSecretPath() {
+        CredentialResolver cr = new CredentialResolver(prop -> agent.getAddress());
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/bad-path");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "404.*warnings.*invalid path");
+    }
+
+    private static void assertErrorContains(Exception e, String s) {
+        assertTrue(String.format("Expected '%s' message but got: %s", s, e.getMessage()), Pattern.matches(".*" + s.toLowerCase()  + ".*", e.getMessage().toLowerCase()));
     }
 
     private static JsonObject get(String path) throws IOException {
