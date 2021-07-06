@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.function.Function;
+import javax.net.ssl.SSLContext;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -16,6 +17,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 
 public class CredentialResolver {
     private final Function<String, String> getProperty;
@@ -45,10 +47,48 @@ public class CredentialResolver {
      */
     public Map resolve(Map args) throws IOException {
         String vaultAddress = getProperty.apply("mid.external_credentials.vault.address");
+        String vaultCA = getProperty.apply("mid.external_credentials.vault.ca");
+        String tlsSkipVerifyRaw = getProperty.apply("mid.external_credentials.vault.tls_skip_verify");
+
+        Boolean tlsSkipVerify = false;
+        if (tlsSkipVerifyRaw != "") {
+            tlsSkipVerify = Boolean.parseBoolean(tlsSkipVerifyRaw);
+        }
+
         String id = (String) args.get(ARG_ID);
 
+        System.out.print("CA is " +vaultCA);
+        SSLContext sslContext;
+        try {
+            TLSConfig tlsConfig = new TLSConfig().verify(!tlsSkipVerify);
+            if (vaultCA != "") {
+                tlsConfig = tlsConfig.pemUTF8(vaultCA);
+            }
+            sslContext = tlsConfig.build().getSslContext();
+        } catch (TLSConfig.TLSException e) {
+            throw new RuntimeException("Failed to configure SSL context: " + e);
+        }
+        if (sslContext == null) {
+            System.out.println("not using custom ssl context");
+        }
+
         String body;
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+
+        CloseableHttpClient httpClient;
+        if (sslContext != null) {
+            SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+                sslContext,
+                null,
+                null,
+                SSLConnectionSocketFactory.getDefaultHostnameVerifier());
+            httpClient = HttpClients.custom()
+                .setSSLSocketFactory(sslsf)
+                .build();
+        } else {
+            httpClient = HttpClients.createDefault();
+        }
+
+        try {
             HttpGet get = new HttpGet(vaultAddress + "/v1/" + id);
             get.setHeader("accept", "application/json");
             get.setHeader("X-Vault-Request", "true");
@@ -67,7 +107,10 @@ public class CredentialResolver {
 
                     throw new RuntimeException(message);
                 }
+                System.out.println(response);
             }
+        } finally {
+            httpClient.close();
         }
 
         System.err.println("Successfully queried Vault for credential id: "+id);
@@ -250,5 +293,29 @@ public class CredentialResolver {
         public String[] getErrors() {
             return errors;
         }
+    }
+
+    public static void main(String[] args) {
+        // For testing purposes
+        CredentialResolver obj = new CredentialResolver(prop -> fakeProperty(prop));
+        var input = new HashMap<String, String>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        Map result = null;
+        try {
+            result = obj.resolve(input);
+        } catch (IOException e) {
+            System.err.println("resolve threw exception");
+            e.printStackTrace();
+        }
+        System.out.println(result);
+    }
+
+    private static String fakeProperty(String p) {
+        var properties = new HashMap<String, String>();
+        properties.put("mid.external_credentials.vault.address", System.getenv("VAULT_ADDR"));
+        properties.put("mid.external_credentials.vault.ca", System.getenv("TEST_CA"));
+        properties.put("mid.external_credentials.vault.tls_skip_verify", System.getenv("TLS_SKIP_VERIFY"));
+
+        return properties.get(p);
     }
 }

@@ -26,10 +26,17 @@ public class CredentialResolverTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody(json)));
 
-        var cr = new CredentialResolver(prop -> "http://localhost:8080");
+        var cr = new CredentialResolver(prop -> testProperty(prop));
         var input = new HashMap<String, String>();
         input.put(CredentialResolver.ARG_ID, path);
         return cr.resolve(input);
+    }
+
+    private static String testProperty(String p) {
+        var properties = new HashMap<String, String>();
+        properties.put("mid.external_credentials.vault.address", "http://localhost:8080");
+
+        return properties.get(p);
     }
 
     @Test
@@ -40,7 +47,7 @@ public class CredentialResolverTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{}")));
 
-        var cr = new CredentialResolver(prop -> "http://localhost:8080");
+        var cr = new CredentialResolver(prop -> testProperty(prop));
         var input = new HashMap<String, String>();
         input.put(CredentialResolver.ARG_ID, "degenerate");
 
