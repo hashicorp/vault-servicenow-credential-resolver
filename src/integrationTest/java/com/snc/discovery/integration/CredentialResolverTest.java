@@ -7,9 +7,6 @@ import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -30,7 +27,6 @@ import static org.junit.Assert.*;
 
 public class CredentialResolverTest {
     private static final String VAULT_IMAGE = "hashicorp/vault:1.7.3";
-    private static final CloseableHttpClient httpClient = HttpClients.createDefault();
     private static final Gson gson = new Gson();
     private static final Network network = Network.newNetwork();
 
@@ -71,11 +67,6 @@ public class CredentialResolverTest {
         // Start vault agent, and mount in approle login details
         agent = new VaultAgentContainer(VAULT_IMAGE, network, roleIdFile.toPath(), secretIdFile.toPath());
         agent.start();
-    }
-
-    @AfterClass
-    public static void teardownClass() throws IOException {
-        httpClient.close();
     }
 
     @Test
