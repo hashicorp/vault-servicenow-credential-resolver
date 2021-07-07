@@ -4,14 +4,15 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.snc.discovery.CredentialResolver;
 import org.apache.http.client.HttpResponseException;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.testcontainers.containers.Network;
 import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
@@ -120,7 +121,9 @@ public class CredentialResolverTest {
     }
 
     private static JsonObject get(String path) throws IOException {
-        return send(new HttpGet(url(path)));
+        HttpGet get = new HttpGet(url(path));
+        get.setHeader("X-Vault-Token", "root");
+        return gson.fromJson(CredentialResolver.send(get), JsonObject.class);
     }
 
     private static JsonObject put(String path, String data) throws IOException {
@@ -128,32 +131,12 @@ public class CredentialResolverTest {
         if (data != null) {
             put.setEntity(new StringEntity(data));
         }
-        return send(put);
+        put.setHeader("X-Vault-Token", "root");
+        return gson.fromJson(CredentialResolver.send(put), JsonObject.class);
     }
 
     private static String url(String path) {
         return String.format("%s/v1/%s", vault.getAddress(), path);
-    }
-
-    // Only used for setting up Vault, not testing, so we always expect 2XXs.
-    private static JsonObject send(HttpUriRequest req) throws IOException {
-        req.setHeader("accept", "application/json");
-        req.setHeader("X-Vault-Request", "true");
-        req.setHeader("X-Vault-Token", "root");
-        try (CloseableHttpResponse response = httpClient.execute(req)) {
-            String body = null;
-            JsonObject json = null;
-            if (response.getEntity() != null) {
-                Scanner s = new Scanner(response.getEntity().getContent()).useDelimiter("\\A");
-                body = s.hasNext() ? s.next() : "";
-                json = gson.fromJson(body, JsonObject.class);
-            }
-            Integer statusCode = response.getStatusLine().getStatusCode();
-            if (statusCode < 200 || statusCode >= 300) {
-                Assert.fail(String.format("Expected 2XX from %s %s but got %d: %s", req.getMethod(), req.getURI(), response.getStatusLine().getStatusCode(), body));
-            }
-            return json;
-        }
     }
 
     private static String readResource(String path) {

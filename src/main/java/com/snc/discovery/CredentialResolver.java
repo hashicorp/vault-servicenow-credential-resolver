@@ -6,6 +6,7 @@ import com.service_now.mid.services.Config;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
@@ -46,18 +47,36 @@ public class CredentialResolver {
         String vaultAddress = getProperty.apply("mid.external_credentials.vault.address");
         String id = (String) args.get(ARG_ID);
 
-        String body;
+        String body = send(new HttpGet(vaultAddress + "/v1/" + id));
+        System.err.println("Successfully queried Vault for credential id: "+id);
+
+        Map<String, String> result = extractKeys(body);
+        CredentialType type = lookupByName((String) args.get(ARG_TYPE));
+        validateResult(result, type);
+        return result;
+    }
+
+    /**
+     * Return the ServiceNow API version supported by this class.
+     */
+    public String getVersion() {
+        return "1.0";
+    }
+
+    public static String send(HttpUriRequest req) throws IOException {
+        String body = null;
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            HttpGet get = new HttpGet(vaultAddress + "/v1/" + id);
-            get.setHeader("accept", "application/json");
-            get.setHeader("X-Vault-Request", "true");
-            try (CloseableHttpResponse response = httpClient.execute(get)) {
-                Scanner s = new Scanner(response.getEntity().getContent()).useDelimiter("\\A");
-                body = s.hasNext() ? s.next() : "";
+            req.setHeader("accept", "application/json");
+            req.setHeader("X-Vault-Request", "true");
+            try (CloseableHttpResponse response = httpClient.execute(req)) {
+                if (response.getEntity() != null) {
+                    Scanner s = new Scanner(response.getEntity().getContent()).useDelimiter("\\A");
+                    body = s.hasNext() ? s.next() : "";
+                }
 
                 int status = response.getStatusLine().getStatusCode();
-                if (status < 200 || status > 299) {
-                    String message = String.format("Failed to query Vault for credential id: %s.", id);
+                if (status < 200 || status >= 300) {
+                    String message = String.format("Failed to query Vault URL: %s.", req.getURI());
                     Gson gson = new Gson();
                     VaultError json = gson.fromJson(body, VaultError.class);
                     if (json != null) {
@@ -76,19 +95,7 @@ public class CredentialResolver {
             }
         }
 
-        System.err.println("Successfully queried Vault for credential id: "+id);
-
-        Map<String, String> result = extractKeys(body);
-        CredentialType type = lookupByName((String) args.get(ARG_TYPE));
-        validateResult(result, type);
-        return result;
-    }
-
-    /**
-     * Return the ServiceNow API version supported by this class.
-     */
-    public String getVersion() {
-        return "1.0";
+        return body;
     }
 
     private Map<String, String> extractKeys(String vaultResponse) {
