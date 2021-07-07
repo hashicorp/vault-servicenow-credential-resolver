@@ -1,25 +1,26 @@
 package com.snc.discovery;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.service_now.mid.services.Config;
+import org.apache.http.client.HttpResponseException;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.function.Function;
-import javax.net.ssl.SSLContext;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-
-import com.service_now.mid.services.Config;
-
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 
 public class CredentialResolver {
+    private static final CloseableHttpClient defaultHTTPClient = HttpClients.createDefault();
     private final Function<String, String> getProperty;
 
     public CredentialResolver() {
@@ -57,7 +58,23 @@ public class CredentialResolver {
 
         String id = (String) args.get(ARG_ID);
 
-        System.out.print("CA is " +vaultCA);
+        String body = send(new HttpGet(vaultAddress + "/v1/" + id), vaultCA, tlsSkipVerify);
+        System.err.println("Successfully queried Vault for credential id: "+id);
+
+        Map<String, String> result = extractKeys(body);
+        CredentialType type = lookupByName((String) args.get(ARG_TYPE));
+        validateResult(result, type);
+        return result;
+    }
+
+    /**
+     * Return the ServiceNow API version supported by this class.
+     */
+    public String getVersion() {
+        return "1.0";
+    }
+
+    public static String send(HttpUriRequest req, String vaultCA, boolean tlsSkipVerify) throws IOException {
         SSLContext sslContext;
         try {
             TLSConfig tlsConfig = new TLSConfig().verify(!tlsSkipVerify);
@@ -72,8 +89,6 @@ public class CredentialResolver {
             System.out.println("not using custom ssl context");
         }
 
-        String body;
-
         CloseableHttpClient httpClient;
         if (sslContext != null) {
             SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
@@ -85,47 +100,39 @@ public class CredentialResolver {
                 .setSSLSocketFactory(sslsf)
                 .build();
         } else {
-            httpClient = HttpClients.createDefault();
+            httpClient = defaultHTTPClient;
         }
 
-        try {
-            HttpGet get = new HttpGet(vaultAddress + "/v1/" + id);
-            get.setHeader("accept", "application/json");
-            get.setHeader("X-Vault-Request", "true");
-            try (CloseableHttpResponse response = httpClient.execute(get)) {
+        String body = null;
+        req.setHeader("accept", "application/json");
+        req.setHeader("X-Vault-Request", "true");
+        try (CloseableHttpResponse response = httpClient.execute(req)) {
+            if (response.getEntity() != null) {
                 Scanner s = new Scanner(response.getEntity().getContent()).useDelimiter("\\A");
                 body = s.hasNext() ? s.next() : "";
-
-                int status = response.getStatusLine().getStatusCode();
-                if (status < 200 || status > 299) {
-                    String message = String.format("Failed to query Vault for credential id: %s. Status code %d.", id, status);
-                    Gson gson = new Gson();
-                    VaultError error = gson.fromJson(body, VaultError.class);
-                    if (error != null) {
-                        message += " Errors: " + Arrays.toString(error.errors);
-                    }
-
-                    throw new RuntimeException(message);
-                }
-                System.out.println(response);
             }
-        } finally {
-            httpClient.close();
+
+            int status = response.getStatusLine().getStatusCode();
+            if (status < 200 || status >= 300) {
+                String message = String.format("Failed to query Vault URL: %s.", req.getURI());
+                Gson gson = new Gson();
+                VaultError json = gson.fromJson(body, VaultError.class);
+                if (json != null) {
+                    final String[] errors = json.getErrors();
+                    if (errors != null && errors.length > 0) {
+                        message += String.format(" Errors: %s.", Arrays.toString(errors));
+                    }
+                    final String[] warnings = json.getWarnings();
+                    if (warnings != null && warnings.length > 0) {
+                        message += String.format(" Warnings: %s.", Arrays.toString(warnings));
+                    }
+                }
+
+                throw new HttpResponseException(status, message);
+            }
         }
 
-        System.err.println("Successfully queried Vault for credential id: "+id);
-
-        Map<String, String> result = extractKeys(body);
-        CredentialType type = lookupByName((String) args.get(ARG_TYPE));
-        validateResult(result, type);
-        return result;
-    }
-
-    /**
-     * Return the ServiceNow API version supported by this class.
-     */
-    public String getVersion() {
-        return "1.0";
+        return body;
     }
 
     private Map<String, String> extractKeys(String vaultResponse) {
@@ -247,75 +254,5 @@ public class CredentialResolver {
         }
 
         return new ValueAndSource(null, null);
-    }
-
-    private static class VaultSecret {
-        private String requestID;
-        private String leaseID;
-        private Integer leaseDuration;
-        private Boolean renewable;
-        private JsonObject data;
-        private String[] warnings;
-        // Auth omitted
-        // WrapInfo omitted
-
-        public String getRequestID() {
-            return requestID;
-        }
-
-        public String getLeaseID() {
-            return leaseID;
-        }
-
-        public Integer getLeaseDuration() {
-            return leaseDuration;
-        }
-
-        public Boolean getRenewable() {
-            return renewable;
-        }
-
-        public JsonObject getData() {
-            return data;
-        }
-
-        public String[] getWarnings() {
-            return warnings;
-        }
-
-        VaultSecret() {
-        }
-    }
-
-    private static class VaultError {
-        private String[] errors;
-
-        public String[] getErrors() {
-            return errors;
-        }
-    }
-
-    public static void main(String[] args) {
-        // For testing purposes
-        CredentialResolver obj = new CredentialResolver(prop -> fakeProperty(prop));
-        var input = new HashMap<String, String>();
-        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
-        Map result = null;
-        try {
-            result = obj.resolve(input);
-        } catch (IOException e) {
-            System.err.println("resolve threw exception");
-            e.printStackTrace();
-        }
-        System.out.println(result);
-    }
-
-    private static String fakeProperty(String p) {
-        var properties = new HashMap<String, String>();
-        properties.put("mid.external_credentials.vault.address", System.getenv("VAULT_ADDR"));
-        properties.put("mid.external_credentials.vault.ca", System.getenv("TEST_CA"));
-        properties.put("mid.external_credentials.vault.tls_skip_verify", System.getenv("TLS_SKIP_VERIFY"));
-
-        return properties.get(p);
     }
 }

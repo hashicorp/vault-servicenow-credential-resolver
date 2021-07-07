@@ -177,27 +177,6 @@ public class TLSConfig implements Serializable {
         }
     }
 
-    /**
-     * A utility method for extracting content from an {@link InputStream} into a UTF-8 encoded {@link String}.  Used
-     * by the various methods in this class that load PEM data from files or classpath resources.
-     *
-     * @param input An InputStream, presumably containing PEM data with UTF-8 encoding
-     * @return A UTF-8 encoded String, containing all of the InputStream's content
-     * @throws IOException
-     */
-    private static String inputStreamToUTF8(final InputStream input) throws IOException {
-        final BufferedReader in = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
-        final StringBuilder utf8 = new StringBuilder();
-        String str;
-        while ((str = in.readLine()) != null) {
-            // String concatenation is less efficient, but for some reason the line-breaks (which are necessary
-            // for Java to correctly parse SSL certs) are stripped off when using a StringBuilder.
-            utf8.append(str).append(System.lineSeparator());
-        }
-        in.close();
-        return utf8.toString();
-    }
-
     public static class TLSException extends Exception {
 
         public TLSException(final Throwable t) {

@@ -66,22 +66,22 @@ public class TLSCredentialResolverTest {
         Assert.assertThrows(SSLException.class, () -> cr.resolve(input));
     }
 
-    @Test
-    public void testTLSSkipVerify() throws IOException {
-        WireMock.configureFor("https", "localhost", 8443);
-        stubFor(get("/v1/kv/user")
-            .withHeader("accept", containing("application/json"))
-            .willReturn(ok()
-                .withHeader("Content-Type", "application/json")
-                .withBody("{'data':{'username':'my-user','password':'my-password'}}")));
-
-        var cr = new CredentialResolver(prop -> testProperty(prop, "true", ""));
-        var input = new HashMap<String, String>();
-        input.put(CredentialResolver.ARG_ID, "kv/user");
-
-        var result = cr.resolve(input);
-        Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("my-password", result.get(CredentialResolver.VAL_PSWD));
-        Assert.assertEquals(2, result.size());
-    }
+//    @Test
+//    public void testTLSSkipVerify() throws IOException {
+//        WireMock.configureFor("https", "localhost", 8443);
+//        stubFor(get("/v1/kv/user")
+//            .withHeader("accept", containing("application/json"))
+//            .willReturn(ok()
+//                .withHeader("Content-Type", "application/json")
+//                .withBody("{'data':{'username':'my-user','password':'my-password'}}")));
+//
+//        var cr = new CredentialResolver(prop -> testProperty(prop, "true", ""));
+//        var input = new HashMap<String, String>();
+//        input.put(CredentialResolver.ARG_ID, "kv/user");
+//
+//        var result = cr.resolve(input);
+//        Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
+//        Assert.assertEquals("my-password", result.get(CredentialResolver.VAL_PSWD));
+//        Assert.assertEquals(2, result.size());
+//    }
 }
