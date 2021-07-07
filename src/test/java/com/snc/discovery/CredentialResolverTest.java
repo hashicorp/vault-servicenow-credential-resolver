@@ -33,7 +33,7 @@ public class CredentialResolverTest {
     }
 
     private static String testProperty(String p) {
-        var properties = new HashMap<String, String>();
+        HashMap<String, String> properties = new HashMap<>();
         properties.put("mid.external_credentials.vault.address", "http://localhost:8080");
 
         return properties.get(p);

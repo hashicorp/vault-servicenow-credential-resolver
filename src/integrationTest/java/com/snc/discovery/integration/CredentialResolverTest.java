@@ -37,6 +37,8 @@ public class CredentialResolverTest {
     @ClassRule
     public static final TemporaryFolder tempFolder = new TemporaryFolder();
 
+    private static HashMap<String, String> properties = new HashMap<>();
+
     @BeforeClass
     public static void setupClass() throws IOException {
         // Create secret material
@@ -71,7 +73,8 @@ public class CredentialResolverTest {
 
     @Test
     public void testHappyPath() throws IOException {
-        CredentialResolver cr = new CredentialResolver(prop -> agent.getAddress());
+        properties.put("mid.external_credentials.vault.address", agent.getAddress());
+        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
         input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
@@ -82,7 +85,8 @@ public class CredentialResolverTest {
 
     @Test
     public void testQueryVaultDirectlyFails() {
-        CredentialResolver cr = new CredentialResolver(prop -> vault.getAddress());
+        properties.put("mid.external_credentials.vault.address", vault.getAddress());
+        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
@@ -91,7 +95,8 @@ public class CredentialResolverTest {
 
     @Test
     public void test404() {
-        CredentialResolver cr = new CredentialResolver(prop -> agent.getAddress());
+        properties.put("mid.external_credentials.vault.address", agent.getAddress());
+        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/not-there");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
@@ -100,7 +105,8 @@ public class CredentialResolverTest {
 
     @Test
     public void testBadSecretPath() {
-        CredentialResolver cr = new CredentialResolver(prop -> agent.getAddress());
+        properties.put("mid.external_credentials.vault.address", agent.getAddress());
+        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/bad-path");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
@@ -114,7 +120,7 @@ public class CredentialResolverTest {
     private static JsonObject get(String path) throws IOException {
         HttpGet get = new HttpGet(url(path));
         get.setHeader("X-Vault-Token", "root");
-        return gson.fromJson(CredentialResolver.send(get), JsonObject.class);
+        return gson.fromJson(CredentialResolver.send(get, "", false), JsonObject.class);
     }
 
     private static JsonObject put(String path, String data) throws IOException {
@@ -123,7 +129,7 @@ public class CredentialResolverTest {
             put.setEntity(new StringEntity(data));
         }
         put.setHeader("X-Vault-Token", "root");
-        return gson.fromJson(CredentialResolver.send(put), JsonObject.class);
+        return gson.fromJson(CredentialResolver.send(put, "", false), JsonObject.class);
     }
 
     private static String url(String path) {

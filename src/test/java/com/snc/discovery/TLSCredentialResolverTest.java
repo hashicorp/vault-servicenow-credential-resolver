@@ -32,14 +32,14 @@ public class TLSCredentialResolverTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody(json)));
 
-        var cr = new CredentialResolver(prop -> testProperty(prop, "", ""));
-        var input = new HashMap<String, String>();
+        CredentialResolver cr = new CredentialResolver(prop -> testProperty(prop, "", ""));
+        HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, path);
         return cr.resolve(input);
     }
 
     private static String testProperty(String p, String skip_verify, String ca) {
-        var properties = new HashMap<String, String>();
+        HashMap<String, String> properties = new HashMap<>();
         properties.put("mid.external_credentials.vault.address", "https://localhost:8443");
         if (skip_verify.length() > 0) {
             properties.put("mid.external_credentials.vault.tls_skip_verify", skip_verify);
@@ -59,8 +59,8 @@ public class TLSCredentialResolverTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody("{}")));
 
-        var cr = new CredentialResolver(prop -> testProperty(prop, "", ""));
-        var input = new HashMap<String, String>();
+        CredentialResolver cr = new CredentialResolver(prop -> testProperty(prop, "", ""));
+        HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "anything");
 
         Assert.assertThrows(SSLException.class, () -> cr.resolve(input));
