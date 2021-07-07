@@ -51,10 +51,6 @@ sourceSets {
 			runtimeClasspath += sourceSets.main.get().output
 			srcDir("src/integrationTest/java")
 		}
-		resources {
-			// Text files to be made available to the integration tests
-			srcDir("src/integrationTest/resources")
-		}
 	}
 }
 
