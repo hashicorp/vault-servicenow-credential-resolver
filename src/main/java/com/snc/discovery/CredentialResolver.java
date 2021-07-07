@@ -18,6 +18,7 @@ import java.util.Scanner;
 import java.util.function.Function;
 
 public class CredentialResolver {
+    private static final CloseableHttpClient httpClient = HttpClients.createDefault();
     private final Function<String, String> getProperty;
 
     public CredentialResolver() {
@@ -65,33 +66,31 @@ public class CredentialResolver {
 
     public static String send(HttpUriRequest req) throws IOException {
         String body = null;
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            req.setHeader("accept", "application/json");
-            req.setHeader("X-Vault-Request", "true");
-            try (CloseableHttpResponse response = httpClient.execute(req)) {
-                if (response.getEntity() != null) {
-                    Scanner s = new Scanner(response.getEntity().getContent()).useDelimiter("\\A");
-                    body = s.hasNext() ? s.next() : "";
-                }
+        req.setHeader("accept", "application/json");
+        req.setHeader("X-Vault-Request", "true");
+        try (CloseableHttpResponse response = httpClient.execute(req)) {
+            if (response.getEntity() != null) {
+                Scanner s = new Scanner(response.getEntity().getContent()).useDelimiter("\\A");
+                body = s.hasNext() ? s.next() : "";
+            }
 
-                int status = response.getStatusLine().getStatusCode();
-                if (status < 200 || status >= 300) {
-                    String message = String.format("Failed to query Vault URL: %s.", req.getURI());
-                    Gson gson = new Gson();
-                    VaultError json = gson.fromJson(body, VaultError.class);
-                    if (json != null) {
-                        final String[] errors = json.getErrors();
-                        if (errors != null && errors.length > 0) {
-                            message += String.format(" Errors: %s.", Arrays.toString(errors));
-                        }
-                        final String[] warnings = json.getWarnings();
-                        if (warnings != null && warnings.length > 0) {
-                            message += String.format(" Warnings: %s.", Arrays.toString(warnings));
-                        }
+            int status = response.getStatusLine().getStatusCode();
+            if (status < 200 || status >= 300) {
+                String message = String.format("Failed to query Vault URL: %s.", req.getURI());
+                Gson gson = new Gson();
+                VaultError json = gson.fromJson(body, VaultError.class);
+                if (json != null) {
+                    final String[] errors = json.getErrors();
+                    if (errors != null && errors.length > 0) {
+                        message += String.format(" Errors: %s.", Arrays.toString(errors));
                     }
-
-                    throw new HttpResponseException(status, message);
+                    final String[] warnings = json.getWarnings();
+                    if (warnings != null && warnings.length > 0) {
+                        message += String.format(" Warnings: %s.", Arrays.toString(warnings));
+                    }
                 }
+
+                throw new HttpResponseException(status, message);
             }
         }
 
