@@ -85,9 +85,6 @@ public class CredentialResolver {
         } catch (TLSConfig.TLSException e) {
             throw new RuntimeException("Failed to configure SSL context: " + e);
         }
-        if (sslContext == null) {
-            System.out.println("not using custom ssl context");
-        }
 
         CloseableHttpClient httpClient;
         if (sslContext != null) {
