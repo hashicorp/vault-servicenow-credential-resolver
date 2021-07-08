@@ -3,6 +3,13 @@ listener "tcp" {
   tls_disable = true
 }
 
+listener "tcp" {
+  address = "0.0.0.0:8301"
+  tls_disable = false
+  tls_cert_file = "/vault/config/vault-agent.pem"
+  tls_key_file = "/vault/config/vault-agent-key.pem"
+}
+
 cache {
   use_auto_auth_token = true
 }

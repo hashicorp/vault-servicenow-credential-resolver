@@ -3,6 +3,7 @@ package com.snc.discovery.integration;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.snc.discovery.CredentialResolver;
+import okhttp3.tls.HeldCertificate;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
@@ -14,9 +15,11 @@ import org.junit.rules.TemporaryFolder;
 import org.testcontainers.containers.Network;
 import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
+import javax.net.ssl.SSLHandshakeException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +40,7 @@ public class CredentialResolverTest {
     @ClassRule
     public static final TemporaryFolder tempFolder = new TemporaryFolder();
 
-    private static HashMap<String, String> properties = new HashMap<>();
+    private static String certPem;
 
     @BeforeClass
     public static void setupClass() throws IOException {
@@ -66,15 +69,29 @@ public class CredentialResolverTest {
         FileUtils.writeStringToFile(roleIdFile, roleId, Charset.defaultCharset());
         FileUtils.writeStringToFile(secretIdFile, secretId, "UTF-8");
 
+        // Generate agent key material
+        String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
+        HeldCertificate localhostCertificate = new HeldCertificate.Builder()
+            .addSubjectAlternativeName(localhost)
+            .build();
+        certPem = localhostCertificate.certificatePem();
+        String keyPem = localhostCertificate.privateKeyPkcs8Pem();
+        File certFile = tempFolder.newFile("agent-cert.pem");
+        File keyFile = tempFolder.newFile("agent-key.pem");
+        FileUtils.writeStringToFile(certFile, certPem, Charset.defaultCharset());
+        FileUtils.writeStringToFile(keyFile, keyPem, Charset.defaultCharset());
+
         // Start vault agent, and mount in approle login details
-        agent = new VaultAgentContainer(VAULT_IMAGE, network, roleIdFile.toPath(), secretIdFile.toPath());
+        agent = new VaultAgentContainer(
+            VAULT_IMAGE, network,
+            roleIdFile.toPath(), secretIdFile.toPath(),
+            certFile.toPath(), keyFile.toPath());
         agent.start();
     }
 
     @Test
     public void testHappyPath() throws IOException {
-        properties.put("mid.external_credentials.vault.address", agent.getAddress());
-        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
         input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
@@ -85,8 +102,7 @@ public class CredentialResolverTest {
 
     @Test
     public void testQueryVaultDirectlyFails() {
-        properties.put("mid.external_credentials.vault.address", vault.getAddress());
-        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
+        CredentialResolver cr = new CredentialResolver(properties(vault.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
@@ -95,8 +111,7 @@ public class CredentialResolverTest {
 
     @Test
     public void test404() {
-        properties.put("mid.external_credentials.vault.address", agent.getAddress());
-        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/not-there");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
@@ -105,12 +120,42 @@ public class CredentialResolverTest {
 
     @Test
     public void testBadSecretPath() {
-        properties.put("mid.external_credentials.vault.address", agent.getAddress());
-        CredentialResolver cr = new CredentialResolver(prop -> properties.get(prop));
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/bad-path");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
         assertErrorContains(e, "404.*warnings.*invalid path");
+    }
+
+    @Test
+    public void testDefaultTLS() {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getTLSAddress(), null, null)::get);
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        SSLHandshakeException e = assertThrows(SSLHandshakeException.class, () -> cr.resolve(input));
+        assertErrorContains(e, ".*unable to find valid certification path to requested target");
+    }
+
+    @Test
+    public void testSkipTLS() throws IOException {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getTLSAddress(), null, true)::get);
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        Map result = cr.resolve(input);
+        assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        assertEquals("foo", result.get(CredentialResolver.VAL_PKEY));
+    }
+
+    @Test
+    public void testCustomCA() throws IOException {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getTLSAddress(), certPem, false)::get);
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        Map result = cr.resolve(input);
+        assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        assertEquals("foo", result.get(CredentialResolver.VAL_PKEY));
     }
 
     private static void assertErrorContains(Exception e, String s) {
@@ -140,5 +185,20 @@ public class CredentialResolverTest {
         InputStream policyResource = Thread.currentThread().getContextClassLoader().getResourceAsStream(path);
         assertNotNull(policyResource);
         return new Scanner(policyResource, "UTF-8").useDelimiter("\\A").next();
+    }
+
+    private static HashMap<String, String> properties(String address, String ca, Boolean skipTLS) {
+        HashMap<String, String> props = new HashMap<>();
+        if (address != null) {
+            props.put("mid.external_credentials.vault.address", address);
+        }
+        if (ca != null) {
+            props.put("mid.external_credentials.vault.ca", ca);
+        }
+        if (skipTLS != null) {
+            props.put("mid.external_credentials.vault.tls_skip_verify", skipTLS.toString());
+        }
+
+        return props;
     }
 }

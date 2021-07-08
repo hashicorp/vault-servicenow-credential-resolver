@@ -21,6 +21,7 @@ import java.util.function.Function;
 
 public class CredentialResolver {
     private static final CloseableHttpClient defaultHTTPClient = HttpClients.createDefault();
+    private static final Gson gson = new Gson();
     private final Function<String, String> getProperty;
 
     public CredentialResolver() {
@@ -112,17 +113,22 @@ public class CredentialResolver {
             int status = response.getStatusLine().getStatusCode();
             if (status < 200 || status >= 300) {
                 String message = String.format("Failed to query Vault URL: %s.", req.getURI());
-                Gson gson = new Gson();
-                VaultError json = gson.fromJson(body, VaultError.class);
-                if (json != null) {
-                    final String[] errors = json.getErrors();
-                    if (errors != null && errors.length > 0) {
-                        message += String.format(" Errors: %s.", Arrays.toString(errors));
+                // Try to parse the error as a Vault error and extract relevant fields.
+                try {
+                    VaultError json = gson.fromJson(body, VaultError.class);
+                    if (json != null) {
+                        final String[] errors = json.getErrors();
+                        if (errors != null && errors.length > 0) {
+                            message += String.format(" Errors: %s.", Arrays.toString(errors));
+                        }
+                        final String[] warnings = json.getWarnings();
+                        if (warnings != null && warnings.length > 0) {
+                            message += String.format(" Warnings: %s.", Arrays.toString(warnings));
+                        }
                     }
-                    final String[] warnings = json.getWarnings();
-                    if (warnings != null && warnings.length > 0) {
-                        message += String.format(" Warnings: %s.", Arrays.toString(warnings));
-                    }
+                } catch (Exception e) {
+                    // Failed to parse the body as a Vault error, just include the body.
+                    message += "\n\n" + body;
                 }
 
                 throw new HttpResponseException(status, message);
