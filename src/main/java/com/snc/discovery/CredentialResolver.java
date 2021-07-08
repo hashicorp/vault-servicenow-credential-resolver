@@ -79,7 +79,7 @@ public class CredentialResolver {
         SSLContext sslContext;
         try {
             TLSConfig tlsConfig = new TLSConfig().verify(!tlsSkipVerify);
-            if (vaultCA != "") {
+            if (vaultCA != null && !vaultCA.equals("")) {
                 tlsConfig = tlsConfig.pemUTF8(vaultCA);
             }
             sslContext = tlsConfig.build().getSslContext();
