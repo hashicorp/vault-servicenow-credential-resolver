@@ -53,7 +53,7 @@ public class CredentialResolver {
         String tlsSkipVerifyRaw = getProperty.apply("mid.external_credentials.vault.tls_skip_verify");
 
         Boolean tlsSkipVerify = false;
-        if (tlsSkipVerifyRaw != "") {
+        if (tlsSkipVerifyRaw != null && !tlsSkipVerifyRaw.equals("")) {
             tlsSkipVerify = Boolean.parseBoolean(tlsSkipVerifyRaw);
         }
 
