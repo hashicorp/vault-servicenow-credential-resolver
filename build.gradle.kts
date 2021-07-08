@@ -34,8 +34,8 @@ dependencies {
 	implementation("com.google.code.gson:gson:2.8.7")
 	implementation("org.apache.httpcomponents:httpclient:4.5.13")
 
-	// libs/ folder requires mid.jar and commons-glide.jar to build
-	implementation(fileTree("libs") { include("*.jar") })
+	// lib/ folder requires mid.jar and commons-glide.jar to build
+	implementation(fileTree("lib") { include("*.jar") })
 
 	testImplementation("junit:junit:4.13.2")
 	testImplementation("com.github.tomakehurst:wiremock-jre8:2.28.1")
