@@ -39,6 +39,9 @@ dependencies {
 
 	testImplementation("junit:junit:4.13.2")
 	testImplementation("com.github.tomakehurst:wiremock-jre8:2.28.1")
+
+	implementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.1"))
+	implementation("com.squareup.okhttp3:okhttp-tls")
 }
 
 // Integration test definition based on:
