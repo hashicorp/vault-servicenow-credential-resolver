@@ -37,7 +37,7 @@ server by running the `jar` Gradle task:
 ./gradlew jar
 ```
 
-You can find the built JAR at `build/libs/vault-servicenow-credential-resolver.jar`.
+You can then find the built JAR at `build/libs/vault-servicenow-credential-resolver.jar`.
 
 ## Running tests
 
