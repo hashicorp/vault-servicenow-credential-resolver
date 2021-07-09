@@ -24,7 +24,6 @@ jobs:
       - run:
           name: Copy in MID server dependencies
           command: |
-            mkdir lib
             id="$(docker create moers/mid-server:"${MID_SERVER_VERSION}")"
             docker cp $id:/opt/agent/lib/mid.jar lib/
             docker cp $id:/opt/agent/lib/commons-glide.jar lib/
@@ -69,7 +68,6 @@ jobs:
       - run:
           name: Copy in MID server dependencies
           command: |
-            mkdir lib
             id="$(docker create moers/mid-server:"${MID_SERVER_VERSION}")"
             docker cp $id:/opt/agent/lib/mid.jar lib/
             docker cp $id:/opt/agent/lib/commons-glide.jar lib/
