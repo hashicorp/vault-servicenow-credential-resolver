@@ -39,10 +39,6 @@ tasks.register("copyMidJars") {
 	description = "Copy MID Jars from docker image"
 	val jars = listOf("lib/mid.jar", "lib/commons-glide.jar")
 	outputs.files(jars)
-	outputs.upToDateWhen {
-		file(jars[0]).exists()
-		file(jars[1]).exists()
-	}
 
 	// Code inside doLast will only run if Gradle decides the task needs running,
 	// e.g. if the Jars are not already in place.
