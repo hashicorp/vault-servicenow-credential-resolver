@@ -19,19 +19,8 @@ instructions.
 
 ## Building from source
 
-To build from source locally, you will need to pull in some dependencies this project
-has on MID server libraries. You can use the excellent Docker images built by
-[bmoers/docker-mid-server] to do this:
-
-```bash
-id="$(docker create moers/mid-server:quebec)"
-docker cp $id:/opt/agent/lib/mid.jar lib/
-docker cp $id:/opt/agent/lib/commons-glide.jar lib/
-docker rm -v $id
-```
-
-Once `lib/` is populated, you can create a JAR file ready to upload to your MID
-server by running the `jar` Gradle task:
+Create a JAR file which you can upload to your MID server by running the `jar`
+Gradle task:
 
 ```bash
 ./gradlew jar
@@ -41,14 +30,11 @@ You can then find the built JAR at `build/libs/vault-servicenow-credential-resol
 
 ## Running tests
 
-If you haven't already, you'll need to manually pull in `mid.jar` and
-`commons-glide.jar` as detailed above.
-
 ```bash
 # Unit tests
 ./gradlew test
 
-# Integration tests - depends on docker
+# Integration tests
 ./gradlew integrationTest
 ```
 

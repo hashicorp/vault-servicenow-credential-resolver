@@ -21,14 +21,6 @@ jobs:
       - checkout
       - setup_remote_docker
 
-      - run:
-          name: Copy in MID server dependencies
-          command: |
-            id="$(docker create moers/mid-server:"${MID_SERVER_VERSION}")"
-            docker cp $id:/opt/agent/lib/mid.jar lib/
-            docker cp $id:/opt/agent/lib/commons-glide.jar lib/
-            docker rm -v $id
-
       # Download and cache dependencies
       - restore_cache:
           keys:
@@ -64,14 +56,6 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
-
-      - run:
-          name: Copy in MID server dependencies
-          command: |
-            id="$(docker create moers/mid-server:"${MID_SERVER_VERSION}")"
-            docker cp $id:/opt/agent/lib/mid.jar lib/
-            docker cp $id:/opt/agent/lib/commons-glide.jar lib/
-            docker rm -v $id
 
       # Download and cache dependencies
       - restore_cache:
