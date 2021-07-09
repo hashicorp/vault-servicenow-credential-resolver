@@ -190,13 +190,13 @@ public class CredentialResolverTest {
     private static HashMap<String, String> properties(String address, String ca, Boolean skipTLS) {
         HashMap<String, String> props = new HashMap<>();
         if (address != null) {
-            props.put("mid.external_credentials.vault.address", address);
+            props.put(CredentialResolver.PROP_ADDRESS, address);
         }
         if (ca != null) {
-            props.put("mid.external_credentials.vault.ca", ca);
+            props.put(CredentialResolver.PROP_CA, ca);
         }
         if (skipTLS != null) {
-            props.put("mid.external_credentials.vault.tls_skip_verify", skipTLS.toString());
+            props.put(CredentialResolver.PROP_TLS_SKIP_VERIFY, skipTLS.toString());
         }
 
         return props;

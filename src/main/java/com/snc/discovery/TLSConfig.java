@@ -1,10 +1,11 @@
 package com.snc.discovery;
 
-import java.io.BufferedReader;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
@@ -14,8 +15,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.Objects;
-import javax.net.ssl.*;
 
 /**
  * <p>A container for SSL-related configuration options, meant to be stored within a {@link CredentialResolver} instance.</p>
@@ -75,7 +74,7 @@ public class TLSConfig implements Serializable {
      * @param verify Whether or not to verify the SSL certificate used by Vault with HTTPS connections.  Default is <code>true</code>.
      * @return This object, with verify populated, ready for additional builder-pattern method calls or else finalization with the build() method
      */
-    public TLSConfig verify(final Boolean verify) {
+    public TLSConfig verify(final boolean verify) {
         this.verifyObject = verify;
         return this;
     }

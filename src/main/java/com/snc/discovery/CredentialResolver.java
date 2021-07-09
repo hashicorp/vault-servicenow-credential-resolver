@@ -44,15 +44,23 @@ public class CredentialResolver {
     public static final String VAL_PASSPHRASE = "passphrase"; // the string pass phrase for the credential
     public static final String VAL_PKEY = "pkey"; // the string private key for the credential
 
+    public static final String PROP_ADDRESS = "mid.external_credentials.vault.address"; // The address of Vault Agent, as resolvable from the MID server
+    public static final String PROP_CA = "mid.external_credentials.vault.ca"; // The custom CA to trust in PEM format
+    public static final String PROP_TLS_SKIP_VERIFY = "mid.external_credentials.vault.tls_skip_verify"; // Whether to skip TLS verification
+
     /**
      * Resolve a credential.
      */
     public Map resolve(Map args) throws IOException {
-        String vaultAddress = getProperty.apply("mid.external_credentials.vault.address");
-        String vaultCA = getProperty.apply("mid.external_credentials.vault.ca");
-        String tlsSkipVerifyRaw = getProperty.apply("mid.external_credentials.vault.tls_skip_verify");
+        String vaultAddress = getProperty.apply(PROP_ADDRESS);
+        String vaultCA = getProperty.apply(PROP_CA);
+        String tlsSkipVerifyRaw = getProperty.apply(PROP_TLS_SKIP_VERIFY);
 
-        Boolean tlsSkipVerify = false;
+        if (vaultAddress == null || vaultAddress.equals("")) {
+            throw new RuntimeException(String.format("MID server property %s is empty but required", PROP_ADDRESS));
+        }
+
+        boolean tlsSkipVerify = false;
         if (tlsSkipVerifyRaw != null && !tlsSkipVerifyRaw.equals("")) {
             tlsSkipVerify = Boolean.parseBoolean(tlsSkipVerifyRaw);
         }

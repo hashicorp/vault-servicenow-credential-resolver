@@ -1,19 +1,15 @@
 package com.snc.discovery;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
-
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.containing;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.ok;
-import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
 public class CredentialResolverTest {
     @Rule
@@ -26,7 +22,7 @@ public class CredentialResolverTest {
                 .withHeader("Content-Type", "application/json")
                 .withBody(json)));
 
-        CredentialResolver cr = new CredentialResolver(prop -> testProperty(prop));
+        CredentialResolver cr = new CredentialResolver(CredentialResolverTest::testProperty);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, path);
         return cr.resolve(input);
@@ -34,22 +30,29 @@ public class CredentialResolverTest {
 
     private static String testProperty(String p) {
         HashMap<String, String> properties = new HashMap<>();
-        properties.put("mid.external_credentials.vault.address", "http://localhost:8080");
+        properties.put(CredentialResolver.PROP_ADDRESS, "http://localhost:8080");
 
         return properties.get(p);
     }
 
     @Test
-    public void testDegenerateCase() {
-        stubFor(get("/v1/degenerate")
+    public void testNoVaultAddressSpecified() {
+        CredentialResolver cr = new CredentialResolver((prop) -> null);
+        Exception exception = Assert.assertThrows(RuntimeException.class, () -> cr.resolve(new HashMap<>()));
+        Assert.assertTrue(exception.getMessage().contains(String.format("MID server property %s is empty but required", CredentialResolver.PROP_ADDRESS)));
+    }
+
+    @Test
+    public void testNoData() {
+        stubFor(get("/v1/no-data")
             .withHeader("accept", containing("application/json"))
             .willReturn(ok()
                 .withHeader("Content-Type", "application/json")
                 .withBody("{}")));
 
-        CredentialResolver cr = new CredentialResolver(prop -> testProperty(prop));
+        CredentialResolver cr = new CredentialResolver(CredentialResolverTest::testProperty);
         HashMap<String, String> input = new HashMap<>();
-        input.put(CredentialResolver.ARG_ID, "degenerate");
+        input.put(CredentialResolver.ARG_ID, "no-data");
 
         Exception exception = Assert.assertThrows(RuntimeException.class, () -> cr.resolve(input));
         Assert.assertTrue(exception.getMessage().contains("No data found"));
