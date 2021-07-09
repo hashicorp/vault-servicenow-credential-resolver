@@ -30,6 +30,15 @@ docker cp $id:/opt/agent/lib/commons-glide.jar lib/
 docker rm -v $id
 ```
 
+Once `lib/` is populated, you can create a JAR file ready to upload to your MID
+server by running the `jar` Gradle task:
+
+```bash
+./gradlew jar
+```
+
+You can find the built JAR at `build/libs/vault-servicenow-credential-resolver.jar`.
+
 ## Running tests
 
 If you haven't already, you'll need to manually pull in `mid.jar` and
