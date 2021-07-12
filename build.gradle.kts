@@ -3,7 +3,6 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
-import java.nio.file.Files
 
 plugins {
 	// https://docs.gradle.org/current/userguide/java_plugin.html#java_plugin
