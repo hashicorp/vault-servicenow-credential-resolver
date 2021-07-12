@@ -76,6 +76,7 @@ dependencies {
 
 	testImplementation("junit:junit:4.13.2")
 	testImplementation("com.github.tomakehurst:wiremock-jre8:2.28.1")
+	testRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
 }
 
 // Integration test definition based on:
@@ -95,6 +96,10 @@ val integrationTestImplementation by configurations.getting {
 	extendsFrom(configurations.implementation.get())
 }
 
+val integrationTestRuntimeOnly by configurations.getting {
+	extendsFrom(configurations.runtimeOnly.get())
+}
+
 configurations["integrationTestRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get())
 
 dependencies {
@@ -102,6 +107,7 @@ dependencies {
 	integrationTestImplementation("org.testcontainers:testcontainers:1.15.3")
 	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.1"))
 	integrationTestImplementation("com.squareup.okhttp3:okhttp-tls")
+	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
 }
 
 // Create the gradle task so we can run `./gradlew integrationTest`
