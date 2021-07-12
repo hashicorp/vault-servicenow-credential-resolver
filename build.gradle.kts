@@ -37,10 +37,10 @@ sourceSets {
 tasks.register("copyMidJars") {
 	group = "build"
 	description = "Copy MID Jars from docker image"
-	val srcDir = Path.of("/opt/agent/lib")
-	val destDir = Path.of("build/mid")
+	val srcDir = "/opt/agent/lib"
+	val destDir = "build/mid"
 	val jars = listOf("mid.jar", "commons-glide.jar")
-	outputs.files(jars.map { Path.of(destDir.toString(), it) })
+	outputs.files(jars.map { "${destDir}/${it}" })
 
 	// Code inside doLast will only run if Gradle decides the task needs running,
 	// e.g. if the Jars are not already in place.
