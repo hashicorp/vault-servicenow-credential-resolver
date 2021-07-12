@@ -2,7 +2,6 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 import java.io.ByteArrayOutputStream
-import java.nio.file.Path
 
 plugins {
 	// https://docs.gradle.org/current/userguide/java_plugin.html#java_plugin
