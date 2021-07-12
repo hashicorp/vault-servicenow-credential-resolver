@@ -19,6 +19,12 @@ instructions.
 
 ## Building from source
 
+Prerequisites:
+
+* JDK 8+
+* Gradle
+* Docker
+
 Create a JAR file which you can upload to your MID server by running the `jar`
 Gradle task:
 

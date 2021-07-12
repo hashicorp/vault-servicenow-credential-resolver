@@ -2,7 +2,8 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 import java.io.ByteArrayOutputStream
-import java.nio.file.Paths
+import java.nio.file.Path
+import java.nio.file.Files
 
 plugins {
 	// https://docs.gradle.org/current/userguide/java_plugin.html#java_plugin
@@ -37,8 +38,10 @@ sourceSets {
 tasks.register("copyMidJars") {
 	group = "build"
 	description = "Copy MID Jars from docker image"
-	val jars = listOf("lib/mid.jar", "lib/commons-glide.jar")
-	outputs.files(jars)
+	val srcDir = Path.of("/opt/agent/lib")
+	val destDir = Path.of("build/mid")
+	val jars = listOf("mid.jar", "commons-glide.jar")
+	outputs.files(jars.map { Path.of(destDir.toString(), it) })
 
 	// Code inside doLast will only run if Gradle decides the task needs running,
 	// e.g. if the Jars are not already in place.
@@ -46,17 +49,19 @@ tasks.register("copyMidJars") {
 		println("Copying MID Jars")
 		val output = ByteArrayOutputStream()
 		exec {
-			commandLine("docker", "create", "moers/mid-server:quebec")
+			commandLine("docker", "create", "moers/mid-server:${System.getenv("MID_SERVER_VERSION") ?: "quebec"}")
 			standardOutput = output
 		}
 		val id = output.toString().trim()
-		for (src in jars) {
+		for (jar in jars) {
 			exec {
-				commandLine("docker", "cp", "${id}:/opt/agent/${src}", "lib/")
+				commandLine("docker", "cp", "${id}:${srcDir}/${jar}", destDir)
 			}
 		}
 		exec {
 			commandLine("docker", "rm", "-v", id)
+			// Suppress output from docker rm
+			standardOutput = output
 		}
 	}
 }
@@ -66,7 +71,7 @@ dependencies {
 	implementation("org.apache.httpcomponents:httpclient:4.5.13")
 
 	// lib/ folder requires mid.jar and commons-glide.jar to build
-	implementation(fileTree("lib") {
+	implementation(fileTree("build/mid") {
 		include("*.jar")
 		builtBy("copyMidJars")
 	} )
