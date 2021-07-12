@@ -100,8 +100,6 @@ val integrationTestRuntimeOnly by configurations.getting {
 	extendsFrom(configurations.runtimeOnly.get())
 }
 
-configurations["integrationTestRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get())
-
 dependencies {
 	integrationTestImplementation("junit:junit:4.13.2")
 	integrationTestImplementation("org.testcontainers:testcontainers:1.15.3")
