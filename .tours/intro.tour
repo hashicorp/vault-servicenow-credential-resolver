@@ -1,0 +1,87 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "intro",
+  "steps": [
+    {
+      "file": "build.gradle.kts",
+      "description": "# Gradle\n\nThis file defines the project structure and build steps. It's written in Gradle's Kotlin DSL.",
+      "line": 1
+    },
+    {
+      "file": "build.gradle.kts",
+      "description": "# Java version\n\nThe project targets a minimum Java version of 1.8. Later versions should work too.\n",
+      "line": 13
+    },
+    {
+      "file": "build.gradle.kts",
+      "description": "# sourceSets\n\nsourceSets defines where the main code and test code is. The test code directory structure mirrors that of the main code.\n\nThe sourceSet for the integration tests is defined later in this file.\n",
+      "line": 21
+    },
+    {
+      "file": "build.gradle.kts",
+      "description": "# copyMidJars task\n\nThis is a custom Gradle task to copy some dependencies from the ServiceNow MID server required for building the project. It creates a MID server Docker container in order to extract the required JAR files.\n\nThese dependencies allow the project to read properties directly from ServiceNow instead of relying on files for configuration.\n\nThe task shouldn't ever need to be run manually, as Gradle will automatically work out when the JAR files are not in place, but you could run it with `./gradlew copyMidJars`.\n",
+      "line": 36
+    },
+    {
+      "file": "build.gradle.kts",
+      "description": "# Dependencies\n\nThis block defines the project's dependencies, split into main and test sets, where test dependencies are an extension of main's.\n\nWhen building the default `./gradlew jar` task, dependencies are not packaged, and it is assumed they will be deployed separately. In practice, all of these dependencies come prepackaged in the MID server's `lib/` folder.\n",
+      "line": 67
+    },
+    {
+      "file": "build.gradle.kts",
+      "description": "# Integration tests\n\nThe integration tests have their own sourceSet and dependencies, all defined together here.\n\nThey spin up Vault and Vault Agent in Docker containers, and so take a bit longer to run.\n",
+      "line": 84
+    },
+    {
+      "file": "build.gradle.kts",
+      "description": "# uberJar task\n\nAs mentioned above, the default `jar` task does not package dependencies into the resulting jar file. The `uberJar` task defined here _does_ package all dependencies, making the resulting jar completely self-contained, although you will not be able to directly execute the resulting jar file unless a `main` method is added to the `com.snc.discovery.CredentialResolver` class.\n",
+      "line": 136
+    },
+    {
+      "file": "gradle/wrapper/gradle-wrapper.properties",
+      "description": "# gradlew\n\nIt is best practice to use `./gradlew` instead of the system's `gradle` for any Gradle tasks. This ensures the Gradle version specified here is always used.\n",
+      "line": 3
+    },
+    {
+      "file": "src/main/java/com/snc/discovery/CredentialResolver.java",
+      "description": "# Package name\n\nWhen invoking an external credential resolver, MID servers search for the class `com.snc.discovery.CredentialResolver` via reflection. I think this can be configured, but it's an easier experience for the end user to just use the default package and class name.\n",
+      "line": 1
+    },
+    {
+      "file": "src/main/java/com/snc/discovery/CredentialResolver.java",
+      "description": "# CredentialResolver constructor\n\nThis constructor is called by the MID server the first time an external credential is requested. It will not get called again unless the server is restarted.\n",
+      "line": 27
+    },
+    {
+      "file": "src/main/java/com/snc/discovery/CredentialResolver.java",
+      "description": "# `resolver` method\n\nThis method is the entry point for the credential resolver. The input map will contain each of the `ARG_...` keys defined above. The output must contain some set of `VAL_...` keys defined above.\n",
+      "line": 54
+    },
+    {
+      "file": "src/main/java/com/snc/discovery/CredentialResolver.java",
+      "description": "# Config\n\nHere is where the resolver reads in all config from the MID server's properties.\n",
+      "line": 55
+    },
+    {
+      "file": "src/main/java/com/snc/discovery/CredentialResolver.java",
+      "description": "# Supported credential types\n\nThis enum defines the explicitly supported ServiceNow credential types. If an unknown type is passed in, the code will attempt to extract fields in the same way as usual, but do less validation of the outputs.\n",
+      "line": 222
+    },
+    {
+      "file": "src/test/java/com/snc/discovery/CredentialResolverTest.java",
+      "description": "# Unit test mock HTTP server\n\nThis line sets up a real HTTP server, whose responses can be configured by calls to `stubFor` below.\n",
+      "line": 16
+    },
+    {
+      "file": "src/integrationTest/java/com/snc/discovery/integration/CredentialResolverTest.java",
+      "description": "# Integration test Vault container\n\nThis line sets up a real Vault server in a Docker container.\n",
+      "line": 37
+    },
+    {
+      "file": "src/integrationTest/java/com/snc/discovery/integration/CredentialResolverTest.java",
+      "description": "# Integration test Vault Agent container\n\nThe Vault Agent container requires some additional files to be generated before it can be started. This is the container that most of the tests will communicate directly with.\n",
+      "line": 85
+    }
+  ],
+  "ref": "aad6ba862f29e915ba4570c406ed4ad3b2b39753"
+}
