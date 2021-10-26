@@ -65,7 +65,7 @@ tasks.register("copyMidJars") {
 }
 
 dependencies {
-	implementation("com.google.code.gson:gson:2.8.7")
+	implementation("com.google.code.gson:gson:2.8.8")
 	implementation("org.apache.httpcomponents:httpclient:4.5.13")
 
 	// lib/ folder requires mid.jar and commons-glide.jar to build
@@ -75,8 +75,8 @@ dependencies {
 	} )
 
 	testImplementation("junit:junit:4.13.2")
-	testImplementation("com.github.tomakehurst:wiremock-jre8:2.28.1")
-	testRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
+	testImplementation("com.github.tomakehurst:wiremock-jre8:2.31.0")
+	testRuntimeOnly("org.slf4j:slf4j-nop:1.7.32")
 }
 
 // Integration test definition based on:
