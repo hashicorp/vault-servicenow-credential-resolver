@@ -1,0 +1,7 @@
+binary {
+	secrets      = true
+	go_modules   = false
+	osv          = true
+	oss_index    = false
+	nvd          = false
+}

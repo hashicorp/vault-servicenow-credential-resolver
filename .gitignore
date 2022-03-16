@@ -21,3 +21,4 @@ build
 
 # Release pipeline
 /pkg/
+/bin/
