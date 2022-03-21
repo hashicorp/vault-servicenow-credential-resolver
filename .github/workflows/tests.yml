@@ -1,0 +1,19 @@
+name: Tests
+
+# Run this workflow on pushes and manually
+on: [push, workflow_dispatch]
+
+env:
+  MID_SERVER_VERSION: sandiego.02-07-2022_1650
+
+jobs:
+  test:
+    name: "Test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test
+        run: ./gradlew test
+      - name: Integration test
+        run: ./gradlew integrationTest
+      

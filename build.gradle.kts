@@ -47,7 +47,7 @@ tasks.register("copyMidJars") {
 		println("Copying MID Jars")
 		val output = ByteArrayOutputStream()
 		exec {
-			commandLine("docker", "create", "moers/mid-server:${System.getenv("MID_SERVER_VERSION") ?: "quebec"}")
+			commandLine("docker", "create", "moers/mid-server:${System.getenv("MID_SERVER_VERSION") ?: "sandiego"}")
 			standardOutput = output
 		}
 		val id = output.toString().trim()
