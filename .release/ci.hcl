@@ -56,7 +56,7 @@ event "security-scan-binaries" {
 }
 
 event "sign" {
-  depends = ["security-scan-containers"]
+  depends = ["security-scan-binaries"]
   action "sign" {
     organization = "hashicorp"
     repository = "crt-workflows-common"
