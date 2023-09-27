@@ -111,6 +111,18 @@ public class CredentialResolverTest {
     }
 
     @Test
+    public void testResolveSnmpV3Fields() throws IOException {
+        Map result = setupAndResolve("kv/snmpv3-creds", "{'data':{'username':'snmpv3-user','authprotocol':'the-authprotocol','authkey':'the-authkey','privprotocol':'the-privprotocol','privkey':'the-privkey'}}");
+
+        Assert.assertEquals("snmpv3-user", result.get(CredentialResolver.VAL_USER));
+        Assert.assertEquals("the-authprotocol", result.get(CredentialResolver.VAL_AUTHPROTO));
+        Assert.assertEquals("the-authkey", result.get(CredentialResolver.VAL_AUTHKEY));
+        Assert.assertEquals("the-privprotocol", result.get(CredentialResolver.VAL_PRIVPROTO));
+        Assert.assertEquals("the-privkey", result.get(CredentialResolver.VAL_PRIVKEY));
+        Assert.assertEquals(5, result.size());
+    }
+
+    @Test
     public void testValidateResultFullyPopulated() {
         CredentialResolver cr = new CredentialResolver(prop -> "");
         HashMap<String, String> input = new HashMap<>();
@@ -118,6 +130,10 @@ public class CredentialResolverTest {
         input.put(CredentialResolver.VAL_PSWD, "");
         input.put(CredentialResolver.VAL_PKEY, "");
         input.put(CredentialResolver.VAL_PASSPHRASE, "");
+        input.put(CredentialResolver.VAL_AUTHPROTO, "");
+        input.put(CredentialResolver.VAL_AUTHKEY, "");
+        input.put(CredentialResolver.VAL_PRIVPROTO, "");
+        input.put(CredentialResolver.VAL_PRIVKEY, "");
         for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
             // No validation errors expected
             cr.validateResult(input, type);
