@@ -52,6 +52,7 @@ public class CredentialResolver {
     public static final String VAL_AUTHKEY = "authkey"; // the string authentication key for the credential
     public static final String VAL_PRIVPROTO = "privprotocol"; // the string privacy protocol for the credential
     public static final String VAL_PRIVKEY = "privkey"; // the string privacy key for the credential
+    public static final String VAL_BEARER = "bearer_token"; // the string brearer token for the credential
 
     public static final String PROP_ADDRESS = "mid.external_credentials.vault.address"; // The address of Vault Agent, as resolvable from the MID server
     public static final String PROP_CA = "mid.external_credentials.vault.ca"; // The custom CA to trust in PEM format
@@ -184,6 +185,7 @@ public class CredentialResolver {
         ValueAndSource authkey = valueAndSourceFromData(data, "authkey");
         ValueAndSource privprotocol = valueAndSourceFromData(data, "privprotocol");
         ValueAndSource privkey = valueAndSourceFromData(data, "privkey");
+        ValueAndSource bearer = valueAndSourceFromData(data, "bearer_token");
         
         System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
                 VAL_USER, username.source,
@@ -193,8 +195,9 @@ public class CredentialResolver {
                 VAL_AUTHPROTO, authprotocol.source,
                 VAL_AUTHKEY, authkey.source,
                 VAL_PRIVPROTO, privprotocol.source,
-                VAL_PRIVKEY, privkey.source);
-                
+                VAL_PRIVKEY, privkey.source,
+                VAL_BEARER, bearer.source);
+               
         HashMap<String, String> result = new HashMap<>();
         if (username.value != null) {
             result.put(VAL_USER, username.value);
@@ -219,6 +222,9 @@ public class CredentialResolver {
         }
         if (privkey.value != null) {
             result.put(VAL_PRIVKEY, privkey.value);
+        }
+        if (bearer.value != null) {
+            result.put(VAL_BEARER, bearer.value);
         }
 
         return result;
@@ -264,7 +270,8 @@ public class CredentialResolver {
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),
         infoblox                            (new String[]{VAL_USER, VAL_PKEY}),
         api_key                             (new String[]{VAL_USER, VAL_PKEY}),
-        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY});
+        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY}),
+        bearer                              (new String[]{VAL_BEARER});
         private final String[] expectedFields;
 
         CredentialType(String[] expectedFields) {
