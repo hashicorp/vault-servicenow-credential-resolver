@@ -47,6 +47,7 @@ public class CredentialResolver {
     public static final String VAL_AUTHKEY = "authkey"; // the string authentication key for the credential
     public static final String VAL_PRIVPROTO = "privprotocol"; // the string privacy protocol for the credential
     public static final String VAL_PRIVKEY = "privkey"; // the string privacy key for the credential
+    public static final String VAL_CONTEXTNAME = "contextname"; // the string context name for the credential
 
     public static final String PROP_ADDRESS = "mid.external_credentials.vault.address"; // The address of Vault Agent, as resolvable from the MID server
     public static final String PROP_CA = "mid.external_credentials.vault.ca"; // The custom CA to trust in PEM format
@@ -179,8 +180,9 @@ public class CredentialResolver {
         ValueAndSource authkey = valueAndSourceFromData(data, "authkey");
         ValueAndSource privprotocol = valueAndSourceFromData(data, "privprotocol");
         ValueAndSource privkey = valueAndSourceFromData(data, "privkey");
+        ValueAndSource contextname = valueAndSourceFromData(data, "contextname");
 
-        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
+        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
                 VAL_USER, username.source,
                 VAL_PSWD, password.source,
                 VAL_PKEY, privateKey.source,
@@ -188,7 +190,8 @@ public class CredentialResolver {
                 VAL_AUTHPROTO, authprotocol.source,
                 VAL_AUTHKEY, authkey.source,
                 VAL_PRIVPROTO, privprotocol.source,
-                VAL_PRIVKEY, privkey.source);
+                VAL_PRIVKEY, privkey.source,
+                VAL_CONTEXTNAME, contextname.source);
 
         HashMap<String, String> result = new HashMap<>();
         if (username.value != null) {
@@ -203,7 +206,7 @@ public class CredentialResolver {
         if (passphrase.value != null) {
             result.put(VAL_PASSPHRASE, passphrase.value);
         }
-         if (authprotocol.value != null) {
+        if (authprotocol.value != null) {
             result.put(VAL_AUTHPROTO, authprotocol.value);
         }
         if (authkey.value != null) {
@@ -214,6 +217,9 @@ public class CredentialResolver {
         }
         if (privkey.value != null) {
             result.put(VAL_PRIVKEY, privkey.value);
+        }
+        if (contextname.value != null) {
+            result.put(VAL_CONTEXTNAME, contextname.value);
         }
 
         return result;
@@ -259,7 +265,7 @@ public class CredentialResolver {
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),
         infoblox                            (new String[]{VAL_USER, VAL_PKEY}),
         api_key                             (new String[]{VAL_USER, VAL_PKEY}),
-        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY});
+        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY, VAL_CONTEXTNAME});
         private final String[] expectedFields;
 
         CredentialType(String[] expectedFields) {
@@ -267,6 +273,9 @@ public class CredentialResolver {
         }
 
         public String[] expectedFields() {
+            if (snmpv3.equals(this)) {
+                return new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY};
+            }
             return expectedFields;
         }
     }
