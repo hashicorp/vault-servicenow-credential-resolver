@@ -8,9 +8,8 @@ package com.snc.discovery;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.apache.http.client.HttpResponseException;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.*;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
@@ -43,6 +42,7 @@ public class CredentialResolver {
     public static final String VAL_PSWD = "pswd"; // the string password for the credential
     public static final String VAL_PASSPHRASE = "passphrase"; // the string pass phrase for the credential
     public static final String VAL_PKEY = "pkey"; // the string private key for the credential
+    public static final String VAL_SSHCERT = "sshcert"; // the string signed SSH-certificate for the credential
     public static final String VAL_AUTHPROTO = "authprotocol"; // the string authentication protocol for the credential
     public static final String VAL_AUTHKEY = "authkey"; // the string authentication key for the credential
     public static final String VAL_PRIVPROTO = "privprotocol"; // the string privacy protocol for the credential
@@ -70,14 +70,23 @@ public class CredentialResolver {
         }
 
         String id = (String) args.get(ARG_ID);
-
-        String body = send(new HttpGet(vaultAddress + "/v1/" + id), vaultCA, tlsSkipVerify);
+        String body = send(buildRequestBase(id, vaultAddress), vaultCA, tlsSkipVerify);
         System.err.println("Successfully queried Vault for credential id: "+id);
 
         Map<String, String> result = extractKeys(body);
         CredentialType type = lookupByName((String) args.get(ARG_TYPE));
         validateResult(result, type);
         return result;
+    }
+
+    private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
+        if (id.contains("/issue/")) {
+            HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
+            post.setEntity(new StringEntity("{}", "UTF-8"));
+            return post;
+        }
+
+        return new HttpGet(vaultAddress + "/v1/" + id);
     }
 
     /**
@@ -173,6 +182,7 @@ public class CredentialResolver {
         // secret_key for AWS secret engine, current_password for AD secret engine
         ValueAndSource password = valueAndSourceFromData(data, "secret_key", "current_password", "password");
         ValueAndSource privateKey = valueAndSourceFromData(data, "private_key");
+        ValueAndSource sshCertificate = valueAndSourceFromData(data, "signed_key");
         ValueAndSource passphrase = valueAndSourceFromData(data, "passphrase");
 
         ValueAndSource authprotocol = valueAndSourceFromData(data, "authprotocol");
@@ -180,10 +190,11 @@ public class CredentialResolver {
         ValueAndSource privprotocol = valueAndSourceFromData(data, "privprotocol");
         ValueAndSource privkey = valueAndSourceFromData(data, "privkey");
 
-        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
+        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
                 VAL_USER, username.source,
                 VAL_PSWD, password.source,
                 VAL_PKEY, privateKey.source,
+                VAL_SSHCERT, sshCertificate.source,
                 VAL_PASSPHRASE, passphrase.source,
                 VAL_AUTHPROTO, authprotocol.source,
                 VAL_AUTHKEY, authkey.source,
@@ -199,6 +210,9 @@ public class CredentialResolver {
         }
         if (privateKey.value != null) {
             result.put(VAL_PKEY, privateKey.value);
+        }
+        if (sshCertificate.value != null) {
+            result.put(VAL_SSHCERT, sshCertificate.value);
         }
         if (passphrase.value != null) {
             result.put(VAL_PASSPHRASE, passphrase.value);
@@ -253,7 +267,7 @@ public class CredentialResolver {
         jdbc                                (new String[]{VAL_USER, VAL_PSWD}),
         jms                                 (new String[]{VAL_USER, VAL_PSWD}),
         aws                                 (new String[]{VAL_USER, VAL_PSWD}),
-        ssh_private_key                     (new String[]{VAL_USER, VAL_PKEY}),
+        ssh_private_key                     (new String[]{VAL_USER, VAL_PKEY, VAL_SSHCERT}),
         sn_cfg_ansible                      (new String[]{VAL_USER, VAL_PKEY}),
         sn_disco_certmgmt_certificate_ca    (new String[]{VAL_USER, VAL_PKEY}),
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),
