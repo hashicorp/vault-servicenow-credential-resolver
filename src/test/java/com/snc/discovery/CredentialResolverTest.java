@@ -33,6 +33,20 @@ public class CredentialResolverTest {
         return cr.resolve(input);
     }
 
+    private Map setupAndResolvePostRequest(String path, String requestJson, String json) throws IOException {
+        stubFor(post("/v1/" + path)
+            .withHeader("accept", containing("application/json"))
+            .withRequestBody(equalToJson(requestJson))
+            .willReturn(ok()
+                .withHeader("Content-Type", "application/json")
+                .withBody(json)));
+
+        CredentialResolver cr = new CredentialResolver(CredentialResolverTest::testProperty);
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, path);
+        return cr.resolve(input);
+    }
+
     private static String testProperty(String p) {
         HashMap<String, String> properties = new HashMap<>();
         properties.put(CredentialResolver.PROP_ADDRESS, "http://localhost:8080");
@@ -68,6 +82,15 @@ public class CredentialResolverTest {
         Map result = setupAndResolve("secret/data/ssh", "{'data':{'data':{'username':'ssh-user','private_key':'my_very_private_key'}}}");
 
         Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
+        Assert.assertEquals(2, result.size());
+    }
+
+    @Test
+    public void testResolveSshEngine() throws IOException {
+        Map result = setupAndResolvePostRequest("mount-path/issue/ssh-user", "{}", "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
+
+        Assert.assertEquals("my_signed_public_key", result.get(CredentialResolver.VAL_SSHCERT));
         Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
         Assert.assertEquals(2, result.size());
     }
@@ -129,6 +152,7 @@ public class CredentialResolverTest {
         input.put(CredentialResolver.VAL_USER, "");
         input.put(CredentialResolver.VAL_PSWD, "");
         input.put(CredentialResolver.VAL_PKEY, "");
+        input.put(CredentialResolver.VAL_SSHCERT, "");
         input.put(CredentialResolver.VAL_PASSPHRASE, "");
         input.put(CredentialResolver.VAL_AUTHPROTO, "");
         input.put(CredentialResolver.VAL_AUTHKEY, "");
