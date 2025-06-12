@@ -7,6 +7,7 @@ package com.snc.discovery;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.service_now.mid.services.Config;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.*;
 import org.apache.http.entity.StringEntity;
@@ -26,6 +27,10 @@ public class CredentialResolver {
     private static final CloseableHttpClient defaultHTTPClient = HttpClients.createDefault();
     private static final Gson gson = new Gson();
     private final Function<String, String> getProperty;
+
+    public CredentialResolver() {
+        getProperty = prop -> Config.get().getProperty(prop);
+    }
 
     public CredentialResolver(Function<String, String> getProperty) {
         this.getProperty = getProperty;
