@@ -88,11 +88,12 @@ public class CredentialResolverTest {
 
     @Test
     public void testResolveSshEngine() throws IOException {
-        Map result = setupAndResolvePostRequest("mount-path/issue/ssh-user", "{}", "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
+        Map result = setupAndResolvePostRequest("mount-path/issue/role-name?user=ssh-user", "{}", "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
 
+        Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
         Assert.assertEquals("my_signed_public_key", result.get(CredentialResolver.VAL_SSHCERT));
         Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
-        Assert.assertEquals(2, result.size());
+        Assert.assertEquals(3, result.size());
     }
 
     @Test

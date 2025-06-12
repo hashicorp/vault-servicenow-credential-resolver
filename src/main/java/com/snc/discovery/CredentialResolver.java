@@ -8,8 +8,10 @@ package com.snc.discovery;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.service_now.mid.services.Config;
+import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.*;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -17,10 +19,10 @@ import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.function.Function;
 
 public class CredentialResolver {
@@ -79,6 +81,21 @@ public class CredentialResolver {
         System.err.println("Successfully queried Vault for credential id: "+id);
 
         Map<String, String> result = extractKeys(body);
+
+        // Hack to allow configuration of the principal for ssh-certificates within ServiceNow
+        if (id.contains("/issue/")) {
+            try {
+                List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
+                for (NameValuePair param : params) {
+                    if (param.getName().equals("user")) {
+                        result.put(VAL_USER, param.getValue());
+                    }
+                }
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         CredentialType type = lookupByName((String) args.get(ARG_TYPE));
         validateResult(result, type);
         return result;
