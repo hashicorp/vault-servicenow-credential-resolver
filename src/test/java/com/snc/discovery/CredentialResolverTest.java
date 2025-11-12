@@ -123,6 +123,19 @@ public class CredentialResolverTest {
     }
 
     @Test
+    public void testResolveSnmpV3FieldsWithContextName() throws IOException {
+        Map result = setupAndResolve("kv/snmpv3-creds-with-contextname", "{'data':{'username':'snmpv3-user','authprotocol':'the-authprotocol','authkey':'the-authkey','privprotocol':'the-privprotocol','privkey':'the-privkey','contextname':'the-contextname'}}");
+
+        Assert.assertEquals("snmpv3-user", result.get(CredentialResolver.VAL_USER));
+        Assert.assertEquals("the-authprotocol", result.get(CredentialResolver.VAL_AUTHPROTO));
+        Assert.assertEquals("the-authkey", result.get(CredentialResolver.VAL_AUTHKEY));
+        Assert.assertEquals("the-privprotocol", result.get(CredentialResolver.VAL_PRIVPROTO));
+        Assert.assertEquals("the-privkey", result.get(CredentialResolver.VAL_PRIVKEY));
+        Assert.assertEquals("the-contextname", result.get(CredentialResolver.VAL_CONTEXTNAME));
+        Assert.assertEquals(6, result.size());
+    }
+
+    @Test
     public void testValidateResultFullyPopulated() {
         CredentialResolver cr = new CredentialResolver(prop -> "");
         HashMap<String, String> input = new HashMap<>();
