@@ -66,7 +66,7 @@ public class CredentialResolver {
     public static final String VAL_PRIVPROTO = "privprotocol"; // the string privacy protocol for the credential
     public static final String VAL_PRIVKEY = "privkey"; // the string privacy key for the credential
     public static final String VAL_CONTEXTNAME = "contextname"; // the string context name for the credential
-    public static final String VAL_BEARER = "bearer_token"; // the string brearer token for the credential
+    public static final String VAL_BEARER = "bearer_token"; // the string bearer token for the credential
     public static final String PROP_ADDRESS = "mid.external_credentials.vault.address"; // The address of Vault Agent, as resolvable from the MID server
     public static final String PROP_CA = "mid.external_credentials.vault.ca"; // The custom CA to trust in PEM format
     public static final String PROP_TLS_SKIP_VERIFY = "mid.external_credentials.vault.tls_skip_verify"; // Whether to skip TLS verification
@@ -225,7 +225,7 @@ public class CredentialResolver {
         ValueAndSource bearer = valueAndSourceFromData(data, "bearer_token");
         ValueAndSource contextname = valueAndSourceFromData(data, "contextname");
 
-        System.err.printf("Setting values from fields %s=%s, %s=%s,  %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",    
+        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
                 VAL_USER, username.source,
                 VAL_PSWD, password.source,
                 VAL_PKEY, privateKey.source,
