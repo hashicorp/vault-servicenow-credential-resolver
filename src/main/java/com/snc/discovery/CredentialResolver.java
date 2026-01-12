@@ -310,7 +310,7 @@ public class CredentialResolver {
         jdbc                                (new String[]{VAL_USER, VAL_PSWD}),
         jms                                 (new String[]{VAL_USER, VAL_PSWD}),
         aws                                 (new String[]{VAL_USER, VAL_PSWD}),
-        ssh_private_key                     (new String[]{VAL_USER, VAL_PKEY, VAL_SSHCERT}),
+        ssh_private_key                     (new String[]{VAL_USER, VAL_PKEY}),
         sn_cfg_ansible                      (new String[]{VAL_USER, VAL_PKEY}),
         sn_disco_certmgmt_certificate_ca    (new String[]{VAL_USER, VAL_PKEY}),
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),
