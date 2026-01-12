@@ -125,6 +125,14 @@ public class CredentialResolverTest {
     }
 
     @Test
+    public void testResolveBearerTokenFields() throws IOException {
+        Map result = setupAndResolve("kv/bearer_token", "{'data':{'bearer_token':'the-bearertoken'}}");
+
+	Assert.assertEquals("the-bearertoken", result.get(CredentialResolver.VAL_BEARER));
+        Assert.assertEquals(1, result.size());
+    }
+
+    @Test
     public void testResolveAwsFields() throws IOException {
         Map result = setupAndResolve("aws/aws-user", "{'data':{'username':'aws-user','password':'aws-password','current_password':'aws-current-password','access_key':'aws-access-key','secret_key':'aws-secret-key'}}");
 
@@ -171,6 +179,7 @@ public class CredentialResolverTest {
         input.put(CredentialResolver.VAL_AUTHKEY, "");
         input.put(CredentialResolver.VAL_PRIVPROTO, "");
         input.put(CredentialResolver.VAL_PRIVKEY, "");
+        input.put(CredentialResolver.VAL_BEARER, "");
         for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
             // No validation errors expected
             cr.validateResult(input, type);

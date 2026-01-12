@@ -28,6 +28,7 @@ import java.util.function.Function;
 public class CredentialResolver {
     private static final CloseableHttpClient defaultHTTPClient = HttpClients.createDefault();
     private static final Gson gson = new Gson();
+    private static final String SSH_CERT_ISSUE_PATH = "/issue/";
     private final Function<String, String> getProperty;
 
     public CredentialResolver() {
@@ -65,7 +66,7 @@ public class CredentialResolver {
     public static final String VAL_PRIVPROTO = "privprotocol"; // the string privacy protocol for the credential
     public static final String VAL_PRIVKEY = "privkey"; // the string privacy key for the credential
     public static final String VAL_CONTEXTNAME = "contextname"; // the string context name for the credential
-
+    public static final String VAL_BEARER = "bearer_token"; // the string brearer token for the credential
     public static final String PROP_ADDRESS = "mid.external_credentials.vault.address"; // The address of Vault Agent, as resolvable from the MID server
     public static final String PROP_CA = "mid.external_credentials.vault.ca"; // The custom CA to trust in PEM format
     public static final String PROP_TLS_SKIP_VERIFY = "mid.external_credentials.vault.tls_skip_verify"; // Whether to skip TLS verification
@@ -94,7 +95,7 @@ public class CredentialResolver {
 
         Map<String, String> result = extractKeys(body);
         // Hack to allow configuration of the principal for ssh-certificates within ServiceNow
-        if (id.contains("/issue/")) {
+        if (id.contains(SSH_CERT_ISSUE_PATH)) {
             try {
                 List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
                 for (NameValuePair param : params) {
@@ -113,7 +114,7 @@ public class CredentialResolver {
     }
 
     private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
-        if (id.contains("/issue/")) {
+        if (id.contains(SSH_CERT_ISSUE_PATH)) {
             HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
             post.setEntity(new StringEntity("{}", "UTF-8"));
             return post;
@@ -221,9 +222,10 @@ public class CredentialResolver {
         ValueAndSource authkey = valueAndSourceFromData(data, "authkey");
         ValueAndSource privprotocol = valueAndSourceFromData(data, "privprotocol");
         ValueAndSource privkey = valueAndSourceFromData(data, "privkey");
+        ValueAndSource bearer = valueAndSourceFromData(data, "bearer_token");
         ValueAndSource contextname = valueAndSourceFromData(data, "contextname");
 
-        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",    
+        System.err.printf("Setting values from fields %s=%s, %s=%s,  %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",    
                 VAL_USER, username.source,
                 VAL_PSWD, password.source,
                 VAL_PKEY, privateKey.source,
@@ -233,6 +235,7 @@ public class CredentialResolver {
                 VAL_AUTHKEY, authkey.source,
                 VAL_PRIVPROTO, privprotocol.source,
                 VAL_PRIVKEY, privkey.source,
+                VAL_BEARER, bearer.source,
                 VAL_CONTEXTNAME, contextname.source);
 
         HashMap<String, String> result = new HashMap<>();
@@ -262,6 +265,9 @@ public class CredentialResolver {
         }
         if (privkey.value != null) {
             result.put(VAL_PRIVKEY, privkey.value);
+        }
+        if (bearer.value != null) {
+            result.put(VAL_BEARER, bearer.value);
         }
         if (contextname.value != null) {
             result.put(VAL_CONTEXTNAME, contextname.value);
@@ -310,7 +316,8 @@ public class CredentialResolver {
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),
         infoblox                            (new String[]{VAL_USER, VAL_PKEY}),
         api_key                             (new String[]{VAL_USER, VAL_PKEY}),
-        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY, VAL_CONTEXTNAME});
+        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY, VAL_CONTEXTNAME}),
+        bearer                              (new String[]{VAL_BEARER});
         private final String[] expectedFields;
 
         CredentialType(String[] expectedFields) {
