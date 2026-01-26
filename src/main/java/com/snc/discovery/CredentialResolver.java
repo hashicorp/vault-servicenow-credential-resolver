@@ -8,25 +8,42 @@ package com.snc.discovery;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.apache.http.client.HttpResponseException;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpUriRequest;
+import com.service_now.mid.services.Config;
+import org.apache.http.NameValuePair;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-
+import org.apache.http.client.methods.*;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.entity.StringEntity;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
+import java.lang.reflect.Method;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.function.Function;
 
 public class CredentialResolver {
     private static final CloseableHttpClient defaultHTTPClient = HttpClients.createDefault();
     private static final Gson gson = new Gson();
+    private static final String SSH_CERT_ISSUE_PATH = "/issue/";
     private final Function<String, String> getProperty;
+
+    public CredentialResolver() {
+        getProperty = prop -> {
+            try {
+                // Use reflection to avoid IConfig interface resolution issue at compile time
+                Method getMethod = Config.class.getMethod("get");
+                Object config = getMethod.invoke(null);
+                Method getPropertyMethod = config.getClass().getMethod("getProperty", String.class);
+                return (String) getPropertyMethod.invoke(config, prop);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to get property: " + prop, e);
+            }
+        };
+    }
 
     public CredentialResolver(Function<String, String> getProperty) {
         this.getProperty = getProperty;
@@ -43,12 +60,13 @@ public class CredentialResolver {
     public static final String VAL_PSWD = "pswd"; // the string password for the credential
     public static final String VAL_PASSPHRASE = "passphrase"; // the string pass phrase for the credential
     public static final String VAL_PKEY = "pkey"; // the string private key for the credential
+    public static final String VAL_SSHCERT = "sshcert"; // the string signed SSH-certificate for the credential
     public static final String VAL_AUTHPROTO = "authprotocol"; // the string authentication protocol for the credential
     public static final String VAL_AUTHKEY = "authkey"; // the string authentication key for the credential
     public static final String VAL_PRIVPROTO = "privprotocol"; // the string privacy protocol for the credential
     public static final String VAL_PRIVKEY = "privkey"; // the string privacy key for the credential
     public static final String VAL_CONTEXTNAME = "contextname"; // the string context name for the credential
-
+    public static final String VAL_BEARER = "bearer_token"; // the string bearer token for the credential
     public static final String PROP_ADDRESS = "mid.external_credentials.vault.address"; // The address of Vault Agent, as resolvable from the MID server
     public static final String PROP_CA = "mid.external_credentials.vault.ca"; // The custom CA to trust in PEM format
     public static final String PROP_TLS_SKIP_VERIFY = "mid.external_credentials.vault.tls_skip_verify"; // Whether to skip TLS verification
@@ -72,13 +90,37 @@ public class CredentialResolver {
 
         String id = (String) args.get(ARG_ID);
 
-        String body = send(new HttpGet(vaultAddress + "/v1/" + id), vaultCA, tlsSkipVerify);
+        String body = send(buildRequestBase(id, vaultAddress), vaultCA, tlsSkipVerify);
         System.err.println("Successfully queried Vault for credential id: "+id);
 
         Map<String, String> result = extractKeys(body);
+        // Hack to allow configuration of the principal for ssh-certificates within ServiceNow
+        if (id.contains(SSH_CERT_ISSUE_PATH)) {
+            try {
+                List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
+                for (NameValuePair param : params) {
+                    if (param.getName().equals("user")) {
+                        result.put(VAL_USER, param.getValue());
+                    }
+                }
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         CredentialType type = lookupByName((String) args.get(ARG_TYPE));
         validateResult(result, type);
         return result;
+    }
+
+    private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
+        if (id.contains(SSH_CERT_ISSUE_PATH)) {
+            HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
+            post.setEntity(new StringEntity("{}", "UTF-8"));
+            return post;
+        }
+
+        return new HttpGet(vaultAddress + "/v1/" + id);
     }
 
     /**
@@ -175,22 +217,25 @@ public class CredentialResolver {
         ValueAndSource password = valueAndSourceFromData(data, "secret_key", "current_password", "password");
         ValueAndSource privateKey = valueAndSourceFromData(data, "private_key");
         ValueAndSource passphrase = valueAndSourceFromData(data, "passphrase");
-
+        ValueAndSource sshCertificate = valueAndSourceFromData(data, "signed_key");
         ValueAndSource authprotocol = valueAndSourceFromData(data, "authprotocol");
         ValueAndSource authkey = valueAndSourceFromData(data, "authkey");
         ValueAndSource privprotocol = valueAndSourceFromData(data, "privprotocol");
         ValueAndSource privkey = valueAndSourceFromData(data, "privkey");
+        ValueAndSource bearer = valueAndSourceFromData(data, "bearer_token");
         ValueAndSource contextname = valueAndSourceFromData(data, "contextname");
 
-        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
+        System.err.printf("Setting values from fields %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s, %s=%s%n",
                 VAL_USER, username.source,
                 VAL_PSWD, password.source,
                 VAL_PKEY, privateKey.source,
                 VAL_PASSPHRASE, passphrase.source,
                 VAL_AUTHPROTO, authprotocol.source,
+                VAL_SSHCERT, sshCertificate.source,
                 VAL_AUTHKEY, authkey.source,
                 VAL_PRIVPROTO, privprotocol.source,
                 VAL_PRIVKEY, privkey.source,
+                VAL_BEARER, bearer.source,
                 VAL_CONTEXTNAME, contextname.source);
 
         HashMap<String, String> result = new HashMap<>();
@@ -202,6 +247,9 @@ public class CredentialResolver {
         }
         if (privateKey.value != null) {
             result.put(VAL_PKEY, privateKey.value);
+        }
+        if (sshCertificate.value != null) {
+            result.put(VAL_SSHCERT, sshCertificate.value);
         }
         if (passphrase.value != null) {
             result.put(VAL_PASSPHRASE, passphrase.value);
@@ -217,6 +265,9 @@ public class CredentialResolver {
         }
         if (privkey.value != null) {
             result.put(VAL_PRIVKEY, privkey.value);
+        }
+        if (bearer.value != null) {
+            result.put(VAL_BEARER, bearer.value);
         }
         if (contextname.value != null) {
             result.put(VAL_CONTEXTNAME, contextname.value);
@@ -265,7 +316,8 @@ public class CredentialResolver {
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),
         infoblox                            (new String[]{VAL_USER, VAL_PKEY}),
         api_key                             (new String[]{VAL_USER, VAL_PKEY}),
-        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY, VAL_CONTEXTNAME});
+        snmpv3                              (new String[]{VAL_USER, VAL_AUTHPROTO, VAL_AUTHKEY, VAL_PRIVPROTO, VAL_PRIVKEY, VAL_CONTEXTNAME}),
+        bearer                              (new String[]{VAL_BEARER});
         private final String[] expectedFields;
 
         CredentialType(String[] expectedFields) {
