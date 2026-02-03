@@ -9,6 +9,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.snc.discovery.CredentialResolver;
 import okhttp3.tls.HeldCertificate;
+import org.apache.hc.client5.http.HttpResponseException;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.core5.http.io.entity.StringEntity;
@@ -110,8 +111,8 @@ public class CredentialResolverTest {
         CredentialResolver cr = new CredentialResolver(properties(vault.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
-        IOException e = assertThrows(IOException.class, () -> cr.resolve(input));
-        assertErrorContains(e, "403");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "permission denied");
     }
 
     @Test
@@ -119,7 +120,7 @@ public class CredentialResolverTest {
         CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/not-there");
-        IOException e = assertThrows(IOException.class, () -> cr.resolve(input));
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
         assertErrorContains(e, "404");
     }
 
@@ -128,8 +129,8 @@ public class CredentialResolverTest {
         CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/bad-path");
-        IOException e = assertThrows(IOException.class, () -> cr.resolve(input));
-        assertErrorContains(e, "404.*warnings.*invalid path");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "Invalid path");
     }
 
     @Test
