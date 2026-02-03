@@ -8,6 +8,7 @@ package com.snc.discovery;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.service_now.mid.services.Config;
+import org.apache.hc.client5.http.HttpResponseException;
 import org.apache.hc.client5.http.classic.methods.*;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
@@ -16,7 +17,6 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuil
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.core5.http.ClassicHttpRequest;
-import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.net.URIBuilder;
@@ -195,7 +195,7 @@ public class CredentialResolver {
                     message += "\n\n" + body;
                 }
 
-                throw new IOException(message);
+                throw new HttpResponseException(status, message);
             }
         }
 
