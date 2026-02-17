@@ -9,10 +9,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.snc.discovery.CredentialResolver;
 import okhttp3.tls.HeldCertificate;
-import org.apache.http.client.HttpResponseException;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.entity.StringEntity;
+import org.apache.hc.client5.http.HttpResponseException;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -111,7 +112,7 @@ public class CredentialResolverTest {
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
-        assertErrorContains(e, "status code: 403.+");
+        assertErrorContains(e, "permission denied");
     }
 
     @Test
@@ -129,7 +130,7 @@ public class CredentialResolverTest {
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/bad-path");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
-        assertErrorContains(e, "404.*warnings.*invalid path");
+        assertErrorContains(e, "Invalid path");
     }
 
     @Test
@@ -176,7 +177,7 @@ public class CredentialResolverTest {
     private static JsonObject put(String path, String data) throws IOException {
         HttpPut put = new HttpPut(url(path));
         if (data != null) {
-            put.setEntity(new StringEntity(data));
+            put.setEntity(new StringEntity(data, StandardCharsets.UTF_8));
         }
         put.setHeader("X-Vault-Token", "root");
         return gson.fromJson(CredentialResolver.send(put, "", false), JsonObject.class);
