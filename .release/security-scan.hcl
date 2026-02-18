@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MPL-2.0
 
 binary {
-	nvd          = true
-    secrets {
-        all = true
-    }
+	secrets      = true
+	go_modules   = false
+	osv          = true
+	oss_index    = false
+	nvd          = false
 }
