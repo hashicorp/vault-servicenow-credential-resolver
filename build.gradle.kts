@@ -128,7 +128,7 @@ val integrationTestRuntimeOnly by configurations.getting {
 
 dependencies {
 	integrationTestImplementation("junit:junit:4.13.2")
-	integrationTestImplementation("org.testcontainers:testcontainers:1.19.8")
+	integrationTestImplementation("org.testcontainers:testcontainers:1.20.4")
 	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.1"))
 	integrationTestImplementation("com.squareup.okhttp3:okhttp-tls")
 	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
