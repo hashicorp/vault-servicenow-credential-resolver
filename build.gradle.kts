@@ -146,14 +146,25 @@ val integrationTest = task<Test>("integrationTest") {
 	// Help Testcontainers find Docker
 	systemProperty("testcontainers.docker.socket.override", "/var/run/docker.sock")
 	systemProperty("testcontainers.ryuk.disabled", "false")
-}
-
-// Only run integration tests if explicitly requested or if Docker is available
-tasks.check {
-	if (project.hasProperty("runIntegrationTests")) {
-		dependsOn(integrationTest)
+	
+	// Skip integration tests if Docker is not available
+	onlyIf {
+		val dockerAvailable = try {
+			val process = ProcessBuilder("docker", "info").start()
+			val exitCode = process.waitFor()
+			exitCode == 0
+		} catch (e: Exception) {
+			false
+		}
+		
+		if (!dockerAvailable) {
+			logger.warn("Skipping integration tests: Docker is not available")
+		}
+		dockerAvailable
 	}
 }
+
+tasks.check { dependsOn(integrationTest) }
 
 // Common test settings
 tasks.withType<Test> {
