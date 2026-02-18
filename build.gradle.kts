@@ -128,7 +128,7 @@ val integrationTestRuntimeOnly by configurations.getting {
 
 dependencies {
 	integrationTestImplementation("junit:junit:4.13.2")
-	integrationTestImplementation("org.testcontainers:testcontainers:1.20.4")
+	integrationTestImplementation("org.testcontainers:testcontainers:1.15.3")
 	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.1"))
 	integrationTestImplementation("com.squareup.okhttp3:okhttp-tls")
 	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
@@ -143,27 +143,7 @@ val integrationTest = task<Test>("integrationTest") {
 	classpath = sourceSets["integrationTest"].runtimeClasspath
 	shouldRunAfter("test")
 	
-	// Help Testcontainers find Docker
-	systemProperty("testcontainers.docker.socket.override", "/var/run/docker.sock")
-	systemProperty("testcontainers.ryuk.disabled", "false")
 	
-	// Skip integration tests if Docker is not available
-	onlyIf {
-		val dockerAvailable = try {
-			val process = ProcessBuilder("docker", "info").start()
-			val exitCode = process.waitFor()
-			exitCode == 0
-		} catch (e: Exception) {
-			false
-		}
-		
-		if (!dockerAvailable) {
-			logger.warn("Skipping integration tests: Docker is not available")
-		}
-		dockerAvailable
-	}
-}
-
 tasks.check { dependsOn(integrationTest) }
 
 // Common test settings
