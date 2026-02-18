@@ -12,8 +12,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      
+      - name: Set up JDK
+        uses: actions/setup-java@8df82f6e06a1fbd2488c1e6f0c3acb9c66c3e9c3 # v4.7.0
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'gradle'
+      
       - name: Test
         run: ./gradlew test
+      
       - name: Integration test
         run: ./gradlew integrationTest
-      
