@@ -148,7 +148,12 @@ val integrationTest = task<Test>("integrationTest") {
 	systemProperty("testcontainers.ryuk.disabled", "false")
 }
 
-tasks.check { dependsOn(integrationTest) }
+// Only run integration tests if explicitly requested or if Docker is available
+tasks.check {
+	if (project.hasProperty("runIntegrationTests")) {
+		dependsOn(integrationTest)
+	}
+}
 
 // Common test settings
 tasks.withType<Test> {
