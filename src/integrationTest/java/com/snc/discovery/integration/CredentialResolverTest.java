@@ -1,219 +1,209 @@
 /*
- * Copyright (c) HashiCorp, Inc.
+ * Copyright IBM Corp. 2021, 2025
  * SPDX-License-Identifier: MPL-2.0
  */
 
-package com.snc.discovery;
+package com.snc.discovery.integration;
 
-import com.github.tomakehurst.wiremock.junit.WireMockRule;
-import org.junit.Assert;
-import org.junit.Rule;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.snc.discovery.CredentialResolver;
+import okhttp3.tls.HeldCertificate;
+import org.apache.http.client.HttpResponseException;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.entity.StringEntity;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+import org.testcontainers.containers.Network;
+import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
+import javax.net.ssl.SSLHandshakeException;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
+import java.util.regex.Pattern;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static org.junit.Assert.*;
 
 public class CredentialResolverTest {
-    @Rule
-    public WireMockRule wireMockRule = new WireMockRule();
+    private static final String VAULT_IMAGE = "hashicorp/vault:1.17.6";
+    private static final Gson gson = new Gson();
+    private static final Network network = Network.newNetwork();
 
-    private Map setupAndResolve(String path, String json) throws IOException {
-        stubFor(get("/v1/" + path)
-            .withHeader("accept", containing("application/json"))
-            .willReturn(ok()
-                .withHeader("Content-Type", "application/json")
-                .withBody(json)));
+    @ClassRule
+    public static final VaultContainer vault = new VaultContainer(VAULT_IMAGE, network);
+    @ClassRule
+    public static VaultAgentContainer agent;
+    @ClassRule
+    public static final TemporaryFolder tempFolder = new TemporaryFolder();
 
-        CredentialResolver cr = new CredentialResolver(CredentialResolverTest::testProperty);
+    private static String certPem;
+
+    @BeforeClass
+    public static void setupClass() throws IOException {
+        // Create secret material
+        put("secret/data/ssh", "{\"data\":{\"username\":\"ssh-user\",\"private_key\":\"foo\"}}");
+
+        // Create policy
+        JsonObject policyJson = new JsonObject();
+        policyJson.addProperty("policy", readResource("policy.hcl"));
+        put("sys/policies/acl/all-kv", gson.toJson(policyJson));
+
+        // Setup approle auth for vault agent to use
+        put("sys/auth/approle", "{\"type\":\"approle\"}");
+        put("auth/approle/role/role1", "{\"bind_secret_id\":\"true\",\"token_policies\":\"all-kv\"}");
+
+        // Fetch approle login details
+        JsonObject response = get("auth/approle/role/role1/role-id");
+        String roleId = response.getAsJsonObject("data").get("role_id").getAsString();
+        response = put("auth/approle/role/role1/secret-id", null);
+        String secretId = response.getAsJsonObject("data").get("secret_id").getAsString();
+
+        // Write approle login details to files
+        tempFolder.create();
+        File roleIdFile = tempFolder.newFile("role_id");
+        File secretIdFile = tempFolder.newFile("secret_id");
+        FileUtils.writeStringToFile(roleIdFile, roleId, Charset.defaultCharset());
+        FileUtils.writeStringToFile(secretIdFile, secretId, "UTF-8");
+
+        // Generate agent key material
+        String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
+        HeldCertificate localhostCertificate = new HeldCertificate.Builder()
+            .addSubjectAlternativeName(localhost)
+            .build();
+        certPem = localhostCertificate.certificatePem();
+        String keyPem = localhostCertificate.privateKeyPkcs8Pem();
+        File certFile = tempFolder.newFile("agent-cert.pem");
+        File keyFile = tempFolder.newFile("agent-key.pem");
+        FileUtils.writeStringToFile(certFile, certPem, Charset.defaultCharset());
+        FileUtils.writeStringToFile(keyFile, keyPem, Charset.defaultCharset());
+
+        // Start vault agent, and mount in approle login details
+        agent = new VaultAgentContainer(
+            VAULT_IMAGE, network,
+            roleIdFile.toPath(), secretIdFile.toPath(),
+            certFile.toPath(), keyFile.toPath());
+        agent.start();
+    }
+
+    @Test
+    public void testHappyPath() throws IOException {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
-        input.put(CredentialResolver.ARG_ID, path);
-        return cr.resolve(input);
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        Map result = cr.resolve(input);
+        assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        assertEquals("foo", result.get(CredentialResolver.VAL_PKEY));
     }
 
-    private Map setupAndResolvePostRequest(String path, String requestJson, String json) throws IOException {
-        stubFor(post("/v1/" + path)
-            .withHeader("accept", containing("application/json"))
-            .withRequestBody(equalToJson(requestJson))
-            .willReturn(ok()
-                .withHeader("Content-Type", "application/json")
-                .withBody(json)));
-
-        CredentialResolver cr = new CredentialResolver(CredentialResolverTest::testProperty);
+    @Test
+    public void testQueryVaultDirectlyFails() {
+        CredentialResolver cr = new CredentialResolver(properties(vault.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
-        input.put(CredentialResolver.ARG_ID, path);
-        return cr.resolve(input);
-    }
-    private static String testProperty(String p) {
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put(CredentialResolver.PROP_ADDRESS, "http://localhost:8080");
-
-        return properties.get(p);
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "status code: 403.+");
     }
 
     @Test
-    public void testNoVaultAddressSpecified() {
-        CredentialResolver cr = new CredentialResolver((prop) -> null);
-        Exception exception = Assert.assertThrows(RuntimeException.class, () -> cr.resolve(new HashMap<>()));
-        Assert.assertTrue(exception.getMessage().contains(String.format("MID server property %s is empty but required", CredentialResolver.PROP_ADDRESS)));
-    }
-
-    @Test
-    public void testNoData() {
-        stubFor(get("/v1/no-data")
-            .withHeader("accept", containing("application/json"))
-            .willReturn(ok()
-                .withHeader("Content-Type", "application/json")
-                .withBody("{}")));
-
-        CredentialResolver cr = new CredentialResolver(CredentialResolverTest::testProperty);
+    public void test404() {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
-        input.put(CredentialResolver.ARG_ID, "no-data");
-
-        Exception exception = Assert.assertThrows(RuntimeException.class, () -> cr.resolve(input));
-        Assert.assertTrue(exception.getMessage().contains("No data found"));
+        input.put(CredentialResolver.ARG_ID, "secret/data/not-there");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "404");
     }
 
     @Test
-    public void testResolveKvV2() throws IOException {
-        Map result = setupAndResolve("secret/data/ssh", "{'data':{'data':{'username':'ssh-user','private_key':'my_very_private_key'}}}");
-
-        Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
-        Assert.assertEquals(2, result.size());
-    }
-
-    @Test
-    public void testResolveSshEngine() throws IOException {
-        Map result = setupAndResolvePostRequest("mount-path/issue/role-name?user=ssh-user", "{}", "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
-
-        Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("my_signed_public_key", result.get(CredentialResolver.VAL_SSHCERT));
-        Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
-        Assert.assertEquals(3, result.size());
-    }
-
-    @Test
-    public void testResolveBasic() throws IOException {
-        Map result = setupAndResolve("kv/user", "{'data':{'username':'my-user','password':'my-password'}}");
-
-        Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("my-password", result.get(CredentialResolver.VAL_PSWD));
-        Assert.assertEquals(2, result.size());
-    }
-
-    @Test
-    public void testResolveSshWithPasswordAndPassphrase() throws IOException {
-        Map result = setupAndResolve("kv/ssh-with-passphrase", "{'data':{'username':'ssh-user','password':'ssh-password','private_key':'ssh-private-key','passphrase':'ssh-passphrase'}}");
-
-        Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("ssh-password", result.get(CredentialResolver.VAL_PSWD));
-        Assert.assertEquals("ssh-private-key", result.get(CredentialResolver.VAL_PKEY));
-        Assert.assertEquals("ssh-passphrase", result.get(CredentialResolver.VAL_PASSPHRASE));
-        Assert.assertEquals(4, result.size());
-    }
-
-    @Test
-    public void testResolveActiveDirectoryFields() throws IOException {
-        Map result = setupAndResolve("ad/ad-user", "{'data':{'username':'my-user','password':'my-password','current_password':'my-current-password'}}");
-
-        Assert.assertEquals("my-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("my-current-password", result.get(CredentialResolver.VAL_PSWD));
-        Assert.assertEquals(2, result.size());
-    }
-
-    @Test
-    public void testResolveBearerTokenFields() throws IOException {
-        Map result = setupAndResolve("kv/bearer_token", "{'data':{'bearer_token':'the-bearertoken'}}");
-
-	Assert.assertEquals("the-bearertoken", result.get(CredentialResolver.VAL_BEARER));
-        Assert.assertEquals(1, result.size());
-    }
-
-    @Test
-    public void testResolveAwsFields() throws IOException {
-        Map result = setupAndResolve("aws/aws-user", "{'data':{'username':'aws-user','password':'aws-password','current_password':'aws-current-password','access_key':'aws-access-key','secret_key':'aws-secret-key'}}");
-
-        Assert.assertEquals("aws-access-key", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("aws-secret-key", result.get(CredentialResolver.VAL_PSWD));
-        Assert.assertEquals(2, result.size());
-    }
-
-    @Test
-    public void testResolveSnmpV3Fields() throws IOException {
-        Map result = setupAndResolve("kv/snmpv3-creds", "{'data':{'username':'snmpv3-user','authprotocol':'the-authprotocol','authkey':'the-authkey','privprotocol':'the-privprotocol','privkey':'the-privkey'}}");
-
-        Assert.assertEquals("snmpv3-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("the-authprotocol", result.get(CredentialResolver.VAL_AUTHPROTO));
-        Assert.assertEquals("the-authkey", result.get(CredentialResolver.VAL_AUTHKEY));
-        Assert.assertEquals("the-privprotocol", result.get(CredentialResolver.VAL_PRIVPROTO));
-        Assert.assertEquals("the-privkey", result.get(CredentialResolver.VAL_PRIVKEY));
-        Assert.assertEquals(5, result.size());
-    }
-
-    @Test
-    public void testResolveSnmpV3FieldsWithContextName() throws IOException {
-        Map result = setupAndResolve("kv/snmpv3-creds-with-contextname", "{'data':{'username':'snmpv3-user','authprotocol':'the-authprotocol','authkey':'the-authkey','privprotocol':'the-privprotocol','privkey':'the-privkey','contextname':'the-contextname'}}");
-
-        Assert.assertEquals("snmpv3-user", result.get(CredentialResolver.VAL_USER));
-        Assert.assertEquals("the-authprotocol", result.get(CredentialResolver.VAL_AUTHPROTO));
-        Assert.assertEquals("the-authkey", result.get(CredentialResolver.VAL_AUTHKEY));
-        Assert.assertEquals("the-privprotocol", result.get(CredentialResolver.VAL_PRIVPROTO));
-        Assert.assertEquals("the-privkey", result.get(CredentialResolver.VAL_PRIVKEY));
-        Assert.assertEquals("the-contextname", result.get(CredentialResolver.VAL_CONTEXTNAME));
-        Assert.assertEquals(6, result.size());
-    }
-
-    @Test
-    public void testValidateResultFullyPopulated() {
-        CredentialResolver cr = new CredentialResolver(prop -> "");
+    public void testBadSecretPath() {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
         HashMap<String, String> input = new HashMap<>();
-        input.put(CredentialResolver.VAL_USER, "");
-        input.put(CredentialResolver.VAL_PSWD, "");
-        input.put(CredentialResolver.VAL_PKEY, "");
-        input.put(CredentialResolver.VAL_SSHCERT, "");
-        input.put(CredentialResolver.VAL_PASSPHRASE, "");
-        input.put(CredentialResolver.VAL_AUTHPROTO, "");
-        input.put(CredentialResolver.VAL_AUTHKEY, "");
-        input.put(CredentialResolver.VAL_PRIVPROTO, "");
-        input.put(CredentialResolver.VAL_PRIVKEY, "");
-        input.put(CredentialResolver.VAL_BEARER, "");
-        for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
-            // No validation errors expected
-            cr.validateResult(input, type);
+        input.put(CredentialResolver.ARG_ID, "secret/bad-path");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "404.*warnings.*invalid path");
+    }
+
+    @Test
+    public void testDefaultTLS() {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getTLSAddress(), null, null)::get);
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        SSLHandshakeException e = assertThrows(SSLHandshakeException.class, () -> cr.resolve(input));
+        assertErrorContains(e, ".*unable to find valid certification path to requested target");
+    }
+
+    @Test
+    public void testSkipTLS() throws IOException {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getTLSAddress(), null, true)::get);
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        Map result = cr.resolve(input);
+        assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        assertEquals("foo", result.get(CredentialResolver.VAL_PKEY));
+    }
+
+    @Test
+    public void testCustomCA() throws IOException {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getTLSAddress(), certPem, false)::get);
+        HashMap<String, String> input = new HashMap<>();
+        input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        Map result = cr.resolve(input);
+        assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        assertEquals("foo", result.get(CredentialResolver.VAL_PKEY));
+    }
+
+    private static void assertErrorContains(Exception e, String s) {
+        assertTrue(String.format("Expected '%s' message but got: %s", s, e.getMessage()), Pattern.matches(".*" + s.toLowerCase()  + ".*", e.getMessage().toLowerCase()));
+    }
+
+    private static JsonObject get(String path) throws IOException {
+        HttpGet get = new HttpGet(url(path));
+        get.setHeader("X-Vault-Token", "root");
+        return gson.fromJson(CredentialResolver.send(get, "", false), JsonObject.class);
+    }
+
+    private static JsonObject put(String path, String data) throws IOException {
+        HttpPut put = new HttpPut(url(path));
+        if (data != null) {
+            put.setEntity(new StringEntity(data));
+        }
+        put.setHeader("X-Vault-Token", "root");
+        return gson.fromJson(CredentialResolver.send(put, "", false), JsonObject.class);
+    }
+
+    private static String url(String path) {
+        return String.format("%s/v1/%s", vault.getAddress(), path);
+    }
+
+    private static String readResource(String path) {
+        InputStream policyResource = Thread.currentThread().getContextClassLoader().getResourceAsStream(path);
+        assertNotNull(policyResource);
+        return new Scanner(policyResource, "UTF-8").useDelimiter("\\A").next();
+    }
+
+    private static HashMap<String, String> properties(String address, String ca, Boolean skipTLS) {
+        HashMap<String, String> props = new HashMap<>();
+        if (address != null) {
+            props.put(CredentialResolver.PROP_ADDRESS, address);
+        }
+        if (ca != null) {
+            props.put(CredentialResolver.PROP_CA, ca);
+        }
+        if (skipTLS != null) {
+            props.put(CredentialResolver.PROP_TLS_SKIP_VERIFY, skipTLS.toString());
         }
 
-        cr.validateResult(input, null);
-    }
-
-    @Test
-    public void testValidateResultEmpty() {
-        CredentialResolver cr = new CredentialResolver(prop -> "");
-        HashMap<String, String> input = new HashMap<>();
-        for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
-            // All types should error for empty input
-            Assert.assertThrows(RuntimeException.class, () -> cr.validateResult(input, type));
-        }
-
-        // null type only validates non-empty
-        Assert.assertThrows(RuntimeException.class, () -> cr.validateResult(input, null));
-        input.put("FOO_KEY", "");
-        // Now that there is some data in the input, no further validation should take place.
-        cr.validateResult(input, null);
-    }
-
-    @Test
-    public void testValidateResultMinimallyPopulated() {
-        CredentialResolver cr = new CredentialResolver(prop -> "");
-        for (CredentialResolver.CredentialType type : CredentialResolver.CredentialType.values()) {
-            HashMap<String, String> input = new HashMap<>();
-            for (String expected : type.expectedFields()) {
-                input.put(expected, "");
-            }
-            // No validation errors expected
-            cr.validateResult(input, type);
-        }
+        return props;
     }
 }
