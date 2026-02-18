@@ -3,16 +3,10 @@
  * SPDX-License-Identifier: MPL-2.0
  */
 
-import org.gradle.api.DefaultTask
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.OutputFiles
-import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
-import org.gradle.process.ExecOperations
 
 import java.io.ByteArrayOutputStream
-import javax.inject.Inject
 
 plugins {
 	// https://docs.gradle.org/current/userguide/java_plugin.html#java_plugin
@@ -44,14 +38,11 @@ sourceSets {
 }
 
 // Copy mid jars for build
-abstract class CopyMidJars @Inject constructor(private val execOps: ExecOperations) : DefaultTask() {
-	@get:Input
+tasks.register("copyMidJars") {
+	group = "build"
+	description = "Copy MID Jars from docker image"
 	val srcDir = "/opt/agent/lib"
-
-	@get:Input
 	val destDir = "build/mid"
-
-	@get:Input
 	val jars = listOf(
         "commons-core-automation.jar",
         "commons-glide.jar",
@@ -59,25 +50,24 @@ abstract class CopyMidJars @Inject constructor(private val execOps: ExecOperatio
         "mid.jar",
         "snc-automation-api.jar",
     )
+	outputs.files(jars.map { "${destDir}/${it}" })
 
-	@get:OutputFiles
-	val outputFiles = jars.map { File("${destDir}/${it}") }
-
-	@TaskAction
-	fun copyJars() {
+	// Code inside doLast will only run if Gradle decides the task needs running,
+	// e.g. if the Jars are not already in place.
+	doLast {
 		println("Copying MID Jars")
 		val output = ByteArrayOutputStream()
-		execOps.exec {
+		exec {
 			commandLine("docker", "create", "moers/mid-server:${System.getenv("MID_SERVER_VERSION") ?: "washingtondc.08-31-2024_1809"}")
 			standardOutput = output
 		}
 		val id = output.toString().trim()
 		for (jar in jars) {
-			execOps.exec {
+			exec {
 				commandLine("docker", "cp", "${id}:${srcDir}/${jar}", destDir)
 			}
 		}
-		execOps.exec {
+		exec {
 			commandLine("docker", "rm", "-v", id)
 			// Suppress output from docker rm
 			standardOutput = output
@@ -85,14 +75,9 @@ abstract class CopyMidJars @Inject constructor(private val execOps: ExecOperatio
 	}
 }
 
-tasks.register<CopyMidJars>("copyMidJars") {
-	group = "build"
-	description = "Copy MID Jars from docker image"
-}
-
 dependencies {
-	implementation("com.google.code.gson:gson:2.13.2")
-	implementation("org.apache.httpcomponents.client5:httpclient5:5.6")
+	implementation("com.google.code.gson:gson:2.8.8")
+	implementation("org.apache.httpcomponents:httpclient:4.5.13")
 
 	// lib/ folder requires mid.jar and commons-glide.jar to build
 	implementation(fileTree("build/mid") {
