@@ -142,6 +142,10 @@ val integrationTest = task<Test>("integrationTest") {
 	testClassesDirs = sourceSets["integrationTest"].output.classesDirs
 	classpath = sourceSets["integrationTest"].runtimeClasspath
 	shouldRunAfter("test")
+	
+	// Help Testcontainers find Docker
+	systemProperty("testcontainers.docker.socket.override", "/var/run/docker.sock")
+	systemProperty("testcontainers.ryuk.disabled", "false")
 }
 
 tasks.check { dependsOn(integrationTest) }
