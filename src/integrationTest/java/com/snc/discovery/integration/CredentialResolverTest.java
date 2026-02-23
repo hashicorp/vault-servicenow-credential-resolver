@@ -13,12 +13,13 @@ import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.StringEntity;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.testcontainers.containers.Network;
-import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FileUtils;
 
 import javax.net.ssl.SSLHandshakeException;
 import java.io.File;
@@ -38,10 +39,9 @@ public class CredentialResolverTest {
     private static final Gson gson = new Gson();
     private static final Network network = Network.newNetwork();
 
-    @ClassRule
-    public static final VaultContainer vault = new VaultContainer(VAULT_IMAGE, network);
-    @ClassRule
-    public static VaultAgentContainer agent;
+    private static VaultContainer vault;
+    private static VaultAgentContainer agent;
+    
     @ClassRule
     public static final TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -49,6 +49,10 @@ public class CredentialResolverTest {
 
     @BeforeClass
     public static void setupClass() throws IOException {
+        // Start vault container
+        vault = new VaultContainer(VAULT_IMAGE, network);
+        vault.start();
+        
         // Create secret material
         put("secret/data/ssh", "{\"data\":{\"username\":\"ssh-user\",\"private_key\":\"foo\"}}");
 
@@ -205,5 +209,18 @@ public class CredentialResolverTest {
         }
 
         return props;
+    }
+
+    @AfterClass
+    public static void tearDownClass() {
+        if (agent != null) {
+            agent.stop();
+        }
+        if (vault != null) {
+            vault.stop();
+        }
+        if (network != null) {
+            network.close();
+        }
     }
 }
