@@ -144,10 +144,6 @@ val integrationTest = task<Test>("integrationTest") {
 	classpath = sourceSets["integrationTest"].runtimeClasspath
 	shouldRunAfter("test")
 	
-	// Set environment variables for Docker compatibility
-	environment("DOCKER_HOST", "unix:///var/run/docker.sock")
-	environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
-	environment("TESTCONTAINERS_RYUK_DISABLED", "true")
 }
 
 tasks.check { dependsOn(integrationTest) }

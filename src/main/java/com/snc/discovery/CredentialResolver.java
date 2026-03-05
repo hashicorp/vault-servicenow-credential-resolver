@@ -116,7 +116,7 @@ public class CredentialResolver {
     private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
             HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
-            post.setEntity(new StringEntity("{}", "UTF-8"));
+            post.setEntity(new StringEntity("{}", StandardCharsets.UTF_8));
             return post;
         }
 
