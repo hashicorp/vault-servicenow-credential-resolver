@@ -72,3 +72,4 @@ jobs:
         with:
           name: ${{ steps.build-binary.outputs.name }}
           path: ${{ steps.build-binary.outputs.path }}
+

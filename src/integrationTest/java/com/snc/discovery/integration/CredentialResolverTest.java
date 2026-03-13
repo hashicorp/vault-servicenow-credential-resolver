@@ -1,5 +1,5 @@
 /*
- * Copyright (c) HashiCorp, Inc.
+ * Copyright IBM Corp. 2021, 2026
  * SPDX-License-Identifier: MPL-2.0
  */
 
@@ -9,16 +9,17 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.snc.discovery.CredentialResolver;
 import okhttp3.tls.HeldCertificate;
-import org.apache.hc.client5.http.HttpResponseException;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.classic.methods.HttpPut;
-import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.http.client.HttpResponseException;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.entity.StringEntity;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.testcontainers.containers.Network;
-import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FileUtils;
 
 import javax.net.ssl.SSLHandshakeException;
 import java.io.File;
@@ -26,7 +27,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -39,10 +39,9 @@ public class CredentialResolverTest {
     private static final Gson gson = new Gson();
     private static final Network network = Network.newNetwork();
 
-    @ClassRule
-    public static final VaultContainer vault = new VaultContainer(VAULT_IMAGE, network);
-    @ClassRule
-    public static VaultAgentContainer agent;
+    private static VaultContainer vault;
+    private static VaultAgentContainer agent;
+    
     @ClassRule
     public static final TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -50,6 +49,10 @@ public class CredentialResolverTest {
 
     @BeforeClass
     public static void setupClass() throws IOException {
+        // Start vault container
+        vault = new VaultContainer(VAULT_IMAGE, network);
+        vault.start();
+        
         // Create secret material
         put("secret/data/ssh", "{\"data\":{\"username\":\"ssh-user\",\"private_key\":\"foo\"}}");
 
@@ -112,7 +115,7 @@ public class CredentialResolverTest {
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/data/ssh");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
-        assertErrorContains(e, "permission denied");
+        assertErrorContains(e, "status code: 403.+");
     }
 
     @Test
@@ -130,7 +133,7 @@ public class CredentialResolverTest {
         HashMap<String, String> input = new HashMap<>();
         input.put(CredentialResolver.ARG_ID, "secret/bad-path");
         HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
-        assertErrorContains(e, "Invalid path");
+        assertErrorContains(e, "404.*warnings.*invalid path");
     }
 
     @Test
@@ -177,7 +180,7 @@ public class CredentialResolverTest {
     private static JsonObject put(String path, String data) throws IOException {
         HttpPut put = new HttpPut(url(path));
         if (data != null) {
-            put.setEntity(new StringEntity(data, StandardCharsets.UTF_8));
+            put.setEntity(new StringEntity(data));
         }
         put.setHeader("X-Vault-Token", "root");
         return gson.fromJson(CredentialResolver.send(put, "", false), JsonObject.class);
@@ -206,5 +209,18 @@ public class CredentialResolverTest {
         }
 
         return props;
+    }
+
+    @AfterClass
+    public static void tearDownClass() {
+        if (agent != null) {
+            agent.stop();
+        }
+        if (vault != null) {
+            vault.stop();
+        }
+        if (network != null) {
+            network.close();
+        }
     }
 }

@@ -7,19 +7,15 @@ package com.snc.discovery;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import org.apache.http.client.HttpResponseException;
 import com.service_now.mid.services.Config;
-import org.apache.hc.client5.http.HttpResponseException;
-import org.apache.hc.client5.http.classic.methods.*;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
-import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
-import org.apache.hc.core5.http.ClassicHttpRequest;
-import org.apache.hc.core5.http.NameValuePair;
-import org.apache.hc.core5.http.io.entity.StringEntity;
-import org.apache.hc.core5.net.URIBuilder;
+import org.apache.http.NameValuePair;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.client.methods.*;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.entity.StringEntity;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -101,8 +97,7 @@ public class CredentialResolver {
         // Hack to allow configuration of the principal for ssh-certificates within ServiceNow
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
             try {
-                URIBuilder uriBuilder = new URIBuilder(new URI(id));
-                List<NameValuePair> params = uriBuilder.getQueryParams();
+                List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
                 for (NameValuePair param : params) {
                     if (param.getName().equals("user")) {
                         result.put(VAL_USER, param.getValue());
@@ -118,9 +113,9 @@ public class CredentialResolver {
         return result;
     }
 
-    private ClassicHttpRequest buildRequestBase(String id, String vaultAddress) {
+    private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
-            HttpPost post = new HttpPost(vaultAddress + "/v1/" + id);
+            HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
             post.setEntity(new StringEntity("{}", StandardCharsets.UTF_8));
             return post;
         }
@@ -135,7 +130,7 @@ public class CredentialResolver {
         return "1.0";
     }
 
-    public static String send(ClassicHttpRequest req, String vaultCA, boolean tlsSkipVerify) throws IOException {
+    public static String send(HttpUriRequest req, String vaultCA, boolean tlsSkipVerify) throws IOException {
         SSLContext sslContext;
         try {
             TLSConfig tlsConfig = new TLSConfig().verify(!tlsSkipVerify);
@@ -149,12 +144,13 @@ public class CredentialResolver {
 
         CloseableHttpClient httpClient;
         if (sslContext != null) {
-            SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext);
-            HttpClientConnectionManager cm = PoolingHttpClientConnectionManagerBuilder.create()
-                .setSSLSocketFactory(sslsf)
-                .build();
+            SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+                sslContext,
+                null,
+                null,
+                SSLConnectionSocketFactory.getDefaultHostnameVerifier());
             httpClient = HttpClients.custom()
-                .setConnectionManager(cm)
+                .setSSLSocketFactory(sslsf)
                 .build();
         } else {
             httpClient = defaultHTTPClient;
@@ -169,14 +165,9 @@ public class CredentialResolver {
                 body = s.hasNext() ? s.next() : "";
             }
 
-            int status = response.getCode();
+            int status = response.getStatusLine().getStatusCode();
             if (status < 200 || status >= 300) {
-                String message;
-                try {
-                    message = String.format("Failed to query Vault URL: %s.", req.getUri());
-                } catch (URISyntaxException e) {
-                    message = "Failed to query Vault URL.";
-                }
+                String message = String.format("Failed to query Vault URL: %s.", req.getURI());
                 // Try to parse the error as a Vault error and extract relevant fields.
                 try {
                     VaultError json = gson.fromJson(body, VaultError.class);

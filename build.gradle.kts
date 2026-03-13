@@ -91,8 +91,8 @@ tasks.register<CopyMidJars>("copyMidJars") {
 }
 
 dependencies {
-	implementation("com.google.code.gson:gson:2.13.2")
-	implementation("org.apache.httpcomponents.client5:httpclient5:5.6")
+	implementation("com.google.code.gson:gson:2.8.8")
+	implementation("org.apache.httpcomponents:httpclient:4.5.13")
 
 	// lib/ folder requires mid.jar and commons-glide.jar to build
 	implementation(fileTree("build/mid") {
@@ -128,7 +128,8 @@ val integrationTestRuntimeOnly by configurations.getting {
 
 dependencies {
 	integrationTestImplementation("junit:junit:4.13.2")
-	integrationTestImplementation("org.testcontainers:testcontainers:1.15.3")
+	integrationTestImplementation("org.testcontainers:testcontainers:2.0.3")
+	integrationTestImplementation("commons-io:commons-io:2.11.0")
 	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.1"))
 	integrationTestImplementation("com.squareup.okhttp3:okhttp-tls")
 	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
@@ -142,6 +143,7 @@ val integrationTest = task<Test>("integrationTest") {
 	testClassesDirs = sourceSets["integrationTest"].output.classesDirs
 	classpath = sourceSets["integrationTest"].runtimeClasspath
 	shouldRunAfter("test")
+	
 }
 
 tasks.check { dependsOn(integrationTest) }
