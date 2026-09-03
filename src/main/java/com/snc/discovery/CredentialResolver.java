@@ -96,15 +96,9 @@ public class CredentialResolver {
         Map<String, String> result = extractKeys(body);
         // Hack to allow configuration of the principal for ssh-certificates within ServiceNow
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
-            try {
-                List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
-                for (NameValuePair param : params) {
-                    if (param.getName().equals("user")) {
-                        result.put(VAL_USER, param.getValue());
-                    }
-                }
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
+            String user = extractUser(id);
+            if (user != null) {
+                result.put(VAL_USER, user);
             }
         }
 
@@ -118,18 +112,7 @@ public class CredentialResolver {
             HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
             // Extract valid_principals from the ?user= query param so Vault knows
             // which principal to issue the certificate for.
-            String principal = null;
-            try {
-                List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
-                for (NameValuePair param : params) {
-                    if (param.getName().equals("user")) {
-                        principal = param.getValue();
-                        break;
-                    }
-                }
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
-            }
+            String principal = extractUser(id);
             String body = principal != null
                 ? String.format("{\"valid_principals\":\"%s\"}", principal)
                 : "{}";
@@ -138,6 +121,21 @@ public class CredentialResolver {
         }
 
         return new HttpGet(vaultAddress + "/v1/" + id);
+    }
+
+    // Parses the ?user= query parameter out of a Credential ID, or null if absent.
+    private static String extractUser(String id) {
+        try {
+            List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
+            for (NameValuePair param : params) {
+                if (param.getName().equals("user")) {
+                    return param.getValue();
+                }
+            }
+            return null;
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
