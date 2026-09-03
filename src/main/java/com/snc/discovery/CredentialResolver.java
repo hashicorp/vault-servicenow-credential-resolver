@@ -116,7 +116,24 @@ public class CredentialResolver {
     private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
             HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
-            post.setEntity(new StringEntity("{}", StandardCharsets.UTF_8));
+            // Extract valid_principals from the ?user= query param so Vault knows
+            // which principal to issue the certificate for.
+            String principal = null;
+            try {
+                List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
+                for (NameValuePair param : params) {
+                    if (param.getName().equals("user")) {
+                        principal = param.getValue();
+                        break;
+                    }
+                }
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+            String body = principal != null
+                ? String.format("{\"valid_principals\":\"%s\"}", principal)
+                : "{}";
+            post.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
             return post;
         }
 
@@ -311,6 +328,7 @@ public class CredentialResolver {
         jms                                 (new String[]{VAL_USER, VAL_PSWD}),
         aws                                 (new String[]{VAL_USER, VAL_PSWD}),
         ssh_private_key                     (new String[]{VAL_USER, VAL_PKEY}),
+        ssh_certificate                     (new String[]{VAL_USER, VAL_PKEY, VAL_SSHCERT}),
         sn_cfg_ansible                      (new String[]{VAL_USER, VAL_PKEY}),
         sn_disco_certmgmt_certificate_ca    (new String[]{VAL_USER, VAL_PKEY}),
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),

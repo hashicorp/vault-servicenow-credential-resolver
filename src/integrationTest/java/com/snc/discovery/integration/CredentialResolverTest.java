@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 import static org.junit.Assert.*;
 
 public class CredentialResolverTest {
-    private static final String VAULT_IMAGE = "hashicorp/vault:1.17.6";
+    private static final String VAULT_IMAGE = "hashicorp/vault:2.0.4";
     private static final Gson gson = new Gson();
     private static final Network network = Network.newNetwork();
 
