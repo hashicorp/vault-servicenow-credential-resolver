@@ -109,18 +109,27 @@ public class CredentialResolver {
 
     private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
-            HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
+            // The ?user= param is consumed by the resolver only, so it is stripped
+            // from the Vault URL to keep it out of Vault's audit log request_uri.
+            HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + stripQuery(id));
             // Extract valid_principals from the ?user= query param so Vault knows
             // which principal to issue the certificate for.
             String principal = extractUser(id);
-            String body = principal != null
-                ? String.format("{\"valid_principals\":\"%s\"}", principal)
-                : "{}";
-            post.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
+            JsonObject payload = new JsonObject();
+            if (principal != null) {
+                payload.addProperty("valid_principals", principal);
+            }
+            post.setEntity(new StringEntity(gson.toJson(payload), StandardCharsets.UTF_8));
             return post;
         }
 
         return new HttpGet(vaultAddress + "/v1/" + id);
+    }
+
+    // Removes any query string from a Credential ID.
+    private static String stripQuery(String id) {
+        int q = id.indexOf('?');
+        return q == -1 ? id : id.substring(0, q);
     }
 
     // Parses the ?user= query parameter out of a Credential ID, or null if absent.
