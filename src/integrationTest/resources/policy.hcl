@@ -4,3 +4,7 @@
 path "secret/*" {
     capabilities = [ "read", "update", "create" ]
 }
+
+path "ssh/issue/*" {
+    capabilities = [ "update", "create" ]
+}

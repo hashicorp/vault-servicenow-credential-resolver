@@ -96,15 +96,9 @@ public class CredentialResolver {
         Map<String, String> result = extractKeys(body);
         // Hack to allow configuration of the principal for ssh-certificates within ServiceNow
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
-            try {
-                List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
-                for (NameValuePair param : params) {
-                    if (param.getName().equals("user")) {
-                        result.put(VAL_USER, param.getValue());
-                    }
-                }
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
+            String user = extractUser(id);
+            if (user != null) {
+                result.put(VAL_USER, user);
             }
         }
 
@@ -115,12 +109,42 @@ public class CredentialResolver {
 
     private HttpRequestBase buildRequestBase(String id, String vaultAddress) {
         if (id.contains(SSH_CERT_ISSUE_PATH)) {
-            HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + id);
-            post.setEntity(new StringEntity("{}", StandardCharsets.UTF_8));
+            // The ?user= param is consumed by the resolver only, so it is stripped
+            // from the Vault URL to keep it out of Vault's audit log request_uri.
+            HttpEntityEnclosingRequestBase post = new HttpPost(vaultAddress + "/v1/" + stripQuery(id));
+            // Extract valid_principals from the ?user= query param so Vault knows
+            // which principal to issue the certificate for.
+            String principal = extractUser(id);
+            JsonObject payload = new JsonObject();
+            if (principal != null) {
+                payload.addProperty("valid_principals", principal);
+            }
+            post.setEntity(new StringEntity(gson.toJson(payload), StandardCharsets.UTF_8));
             return post;
         }
 
         return new HttpGet(vaultAddress + "/v1/" + id);
+    }
+
+    // Removes any query string from a Credential ID.
+    private static String stripQuery(String id) {
+        int q = id.indexOf('?');
+        return q == -1 ? id : id.substring(0, q);
+    }
+
+    // Parses the ?user= query parameter out of a Credential ID, or null if absent.
+    private static String extractUser(String id) {
+        try {
+            List<NameValuePair> params = URLEncodedUtils.parse(new URI(id), StandardCharsets.UTF_8);
+            for (NameValuePair param : params) {
+                if (param.getName().equals("user")) {
+                    return param.getValue();
+                }
+            }
+            return null;
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -311,6 +335,7 @@ public class CredentialResolver {
         jms                                 (new String[]{VAL_USER, VAL_PSWD}),
         aws                                 (new String[]{VAL_USER, VAL_PSWD}),
         ssh_private_key                     (new String[]{VAL_USER, VAL_PKEY}),
+        ssh_certificate                     (new String[]{VAL_USER, VAL_PKEY, VAL_SSHCERT}),
         sn_cfg_ansible                      (new String[]{VAL_USER, VAL_PKEY}),
         sn_disco_certmgmt_certificate_ca    (new String[]{VAL_USER, VAL_PKEY}),
         cfg_chef_credentials                (new String[]{VAL_USER, VAL_PKEY}),

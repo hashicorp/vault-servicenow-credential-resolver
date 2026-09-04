@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 import static org.junit.Assert.*;
 
 public class CredentialResolverTest {
-    private static final String VAULT_IMAGE = "hashicorp/vault:1.17.6";
+    private static final String VAULT_IMAGE = "hashicorp/vault:2.0.4";
     private static final Gson gson = new Gson();
     private static final Network network = Network.newNetwork();
 
@@ -55,6 +55,12 @@ public class CredentialResolverTest {
         
         // Create secret material
         put("secret/data/ssh", "{\"data\":{\"username\":\"ssh-user\",\"private_key\":\"foo\"}}");
+
+        // Setup ssh secrets engine for dynamic SSH certificates
+        put("sys/mounts/ssh", "{\"type\":\"ssh\"}");
+        put("ssh/config/ca", "{\"generate_signing_key\":true}");
+        put("ssh/roles/cert-role", "{\"key_type\":\"ca\",\"allow_user_certificates\":true," +
+            "\"allowed_users\":\"ssh-user\",\"default_user\":\"ssh-user\",\"ttl\":\"5m\"}");
 
         // Create policy
         JsonObject policyJson = new JsonObject();
@@ -165,6 +171,46 @@ public class CredentialResolverTest {
         Map result = cr.resolve(input);
         assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
         assertEquals("foo", result.get(CredentialResolver.VAL_PKEY));
+    }
+
+    @Test
+    public void testSshCertificateIssue() throws IOException {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
+        HashMap<String, String> input = new HashMap<>();
+        // ServiceNow classifies dynamic SSH certificate credentials as ssh_private_key.
+        input.put(CredentialResolver.ARG_ID, "ssh/issue/cert-role?user=ssh-user");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        Map result = cr.resolve(input);
+
+        assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        assertNotNull(result.get(CredentialResolver.VAL_PKEY));
+        String cert = (String) result.get(CredentialResolver.VAL_SSHCERT);
+        assertNotNull(cert);
+        assertTrue("Expected an SSH certificate but got: " + cert, cert.contains("-cert-v01@openssh.com"));
+    }
+
+    @Test
+    public void testSshCertificateWithoutUserFailsValidation() {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
+        HashMap<String, String> input = new HashMap<>();
+        // Vault issues the certificate using the role's default_user, but returns no
+        // username, so the ?user= param is required to satisfy ServiceNow's type.
+        input.put(CredentialResolver.ARG_ID, "ssh/issue/cert-role");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        RuntimeException e = assertThrows(RuntimeException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "expected 'user' field for credential type ssh_private_key");
+    }
+
+    @Test
+    public void testSshCertificateRejectsInjectedParameters() {
+        CredentialResolver cr = new CredentialResolver(properties(agent.getAddress(), null, null)::get);
+        HashMap<String, String> input = new HashMap<>();
+        // A quote in the user param must stay inside the valid_principals string
+        // rather than adding a ttl field to the issue request.
+        input.put(CredentialResolver.ARG_ID, "ssh/issue/cert-role?user=ssh-user%22%2C%22ttl%22%3A%22999h");
+        input.put(CredentialResolver.ARG_TYPE, "ssh_private_key");
+        HttpResponseException e = assertThrows(HttpResponseException.class, () -> cr.resolve(input));
+        assertErrorContains(e, "is not a valid value for valid_principals");
     }
 
     private static void assertErrorContains(Exception e, String s) {

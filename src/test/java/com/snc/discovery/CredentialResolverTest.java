@@ -34,11 +34,17 @@ public class CredentialResolverTest {
     }
 
     private Map setupAndResolvePostRequest(String path, String requestJson, String json) throws IOException {
-        stubFor(post("/v1/" + path)
+        // The resolver must strip the ?user= query before calling Vault, so the stub
+        // is registered against the bare path. A stray query string will not match.
+        int q = path.indexOf('?');
+        String vaultPath = q == -1 ? path : path.substring(0, q);
+
+        stubFor(post(urlEqualTo("/v1/" + vaultPath))
             .withHeader("accept", containing("application/json"))
             .withRequestBody(equalToJson(requestJson))
             .willReturn(ok()
                 .withHeader("Content-Type", "application/json")
+                .withHeader("Connection", "close")
                 .withBody(json)));
 
         CredentialResolver cr = new CredentialResolver(CredentialResolverTest::testProperty);
@@ -87,12 +93,61 @@ public class CredentialResolverTest {
 
     @Test
     public void testResolveSshEngine() throws IOException {
-        Map result = setupAndResolvePostRequest("mount-path/issue/role-name?user=ssh-user", "{}", "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
+        Map result = setupAndResolvePostRequest("mount-path/issue/role-name?user=ssh-user", "{\"valid_principals\":\"ssh-user\"}", "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
 
         Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
         Assert.assertEquals("my_signed_public_key", result.get(CredentialResolver.VAL_SSHCERT));
         Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
         Assert.assertEquals(3, result.size());
+    }
+
+    @Test
+    public void testResolveSshEngineWithoutUser() throws IOException {
+        Map result = setupAndResolvePostRequest("mount-path/issue/role-name", "{}", "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
+
+        Assert.assertEquals("my_signed_public_key", result.get(CredentialResolver.VAL_SSHCERT));
+        Assert.assertEquals("my_very_private_key", result.get(CredentialResolver.VAL_PKEY));
+        Assert.assertNull(result.get(CredentialResolver.VAL_USER));
+        Assert.assertEquals(2, result.size());
+    }
+
+    @Test
+    public void testResolveSshEngineDoesNotInjectExtraFields() throws IOException {
+        // A quote in the user query param must not close the JSON string and add
+        // new fields (e.g. ttl) to the issue request.
+        Map result = setupAndResolvePostRequest(
+            "mount-path/issue/role-name?user=bob%22%2C%22ttl%22%3A%22999h",
+            "{\"valid_principals\":\"bob\\\",\\\"ttl\\\":\\\"999h\"}",
+            "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
+
+        Assert.assertEquals("bob\",\"ttl\":\"999h", result.get(CredentialResolver.VAL_USER));
+    }
+
+    @Test
+    public void testResolveSshEngineEscapesBackslashInUser() throws IOException {
+        // Domain-style principals contain a backslash, which must be escaped to
+        // produce valid JSON.
+        Map result = setupAndResolvePostRequest(
+            "mount-path/issue/role-name?user=dom%5Cuser",
+            "{\"valid_principals\":\"dom\\\\user\"}",
+            "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
+
+        Assert.assertEquals("dom\\user", result.get(CredentialResolver.VAL_USER));
+        Assert.assertEquals("my_signed_public_key", result.get(CredentialResolver.VAL_SSHCERT));
+    }
+
+    @Test
+    public void testResolveSshEngineStripsQueryFromVaultUrl() throws IOException {
+        // The ?user= param is resolver-only and must not be forwarded to Vault,
+        // where it would appear in cleartext in the audit log's request_uri.
+        Map result = setupAndResolvePostRequest(
+            "mount-path/issue/role-name?user=ssh-user",
+            "{\"valid_principals\":\"ssh-user\"}",
+            "{'data':{'signed_key':'my_signed_public_key','private_key':'my_very_private_key'}}");
+
+        Assert.assertEquals("ssh-user", result.get(CredentialResolver.VAL_USER));
+        verify(postRequestedFor(urlEqualTo("/v1/mount-path/issue/role-name")));
+        verify(0, postRequestedFor(urlMatching(".*[?].*")));
     }
 
     @Test
