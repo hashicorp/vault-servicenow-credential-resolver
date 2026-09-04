@@ -2,7 +2,7 @@
 
 Features:
 
-* Add support for dynamic SSH certificates via Vault's SSH secrets engine. [GH-43](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/43)
+* Issues dynamic SSH certificates for the configured user instead of the Vault role's `default_user`. [GH-43](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/43)
 
 ## 0.2.0 (November 15, 2023)
 
