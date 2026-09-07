@@ -91,7 +91,7 @@ tasks.register<CopyMidJars>("copyMidJars") {
 }
 
 dependencies {
-	implementation("com.google.code.gson:gson:2.8.8")
+	implementation("com.google.code.gson:gson:2.14.0")
 	implementation("org.apache.httpcomponents:httpclient:4.5.13")
 
 	// lib/ folder requires mid.jar and commons-glide.jar to build
@@ -101,7 +101,7 @@ dependencies {
 	} )
 
 	testImplementation("junit:junit:4.13.2")
-	testImplementation("com.github.tomakehurst:wiremock-jre8:2.31.0")
+	testImplementation("com.github.tomakehurst:wiremock-jre8:2.35.2")
 	testRuntimeOnly("org.slf4j:slf4j-nop:1.7.32")
 }
 
@@ -130,9 +130,53 @@ dependencies {
 	integrationTestImplementation("junit:junit:4.13.2")
 	integrationTestImplementation("org.testcontainers:testcontainers:2.0.3")
 	integrationTestImplementation("commons-io:commons-io:2.11.0")
-	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.1"))
+	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:4.12.0"))
 	integrationTestImplementation("com.squareup.okhttp3:okhttp-tls")
 	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
+}
+
+// Patched versions for libraries that reach the build only through WireMock and
+// Testcontainers. Constraining them here keeps the test classpath clean without
+// touching the shipped artifact, which resolves these from no other source.
+val testOnlySecurityUpgrades = listOf(
+	"com.fasterxml.jackson.core:jackson-annotations:2.22",
+	"com.fasterxml.jackson.core:jackson-core:2.22.2",
+	"com.fasterxml.jackson.core:jackson-databind:2.22.2",
+	"com.github.jknack:handlebars:4.5.4",
+	"com.github.jknack:handlebars-helpers:4.5.4",
+	"com.google.guava:guava:33.7.1-jre",
+	"com.jayway.jsonpath:json-path:2.9.0",
+	"commons-fileupload:commons-fileupload:1.6.0",
+	"commons-io:commons-io:2.20.0",
+	"net.minidev:json-smart:2.6.0",
+	"org.apache.commons:commons-lang3:3.20.0",
+	"org.apache.httpcomponents.client5:httpclient5:5.6.4",
+	"org.apache.httpcomponents.core5:httpcore5:5.4.3",
+	"org.apache.httpcomponents.core5:httpcore5-h2:5.4.3",
+	"org.eclipse.jetty.http2:http2-common:9.4.58.v20250814",
+	"org.eclipse.jetty.http2:http2-hpack:9.4.58.v20250814",
+	"org.eclipse.jetty.http2:http2-server:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-client:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-http:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-io:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-proxy:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-security:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-server:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-servlet:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-servlets:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-util:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-webapp:9.4.58.v20250814",
+	"org.eclipse.jetty:jetty-xml:9.4.58.v20250814",
+	"org.xmlunit:xmlunit-core:2.13.0",
+)
+
+dependencies {
+	constraints {
+		testOnlySecurityUpgrades.forEach { coordinate ->
+			add("testImplementation", coordinate)
+			add("integrationTestImplementation", coordinate)
+		}
+	}
 }
 
 // Create the gradle task so we can run `./gradlew integrationTest`
@@ -168,6 +212,10 @@ tasks.register<Jar>("uberJar") {
 
 	archiveClassifier.set("uber")
 
+	// Bundled dependencies ship multi-release metadata (META-INF/versions/**) that
+	// collides when flattened; the first occurrence wins.
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
 	from(sourceSets.main.get().output)
 
 	dependsOn(configurations.runtimeClasspath)
@@ -177,4 +225,10 @@ tasks.register<Jar>("uberJar") {
 			if (it.isDirectory) it else zipTree(it)
 		}
 	})
+}
+
+// Lock resolved dependency versions so OSV-Scanner can read gradle.lockfile.
+// Regenerate after changing dependencies: ./gradlew dependencies --write-locks
+dependencyLocking {
+	lockAllConfigurations()
 }
