@@ -129,7 +129,7 @@ val integrationTestRuntimeOnly by configurations.getting {
 dependencies {
 	integrationTestImplementation("junit:junit:4.13.2")
 	integrationTestImplementation("org.testcontainers:testcontainers:2.0.3")
-	integrationTestImplementation("commons-io:commons-io:2.20.0")
+	integrationTestImplementation("commons-io:commons-io:2.22.0")
 	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:4.12.0"))
 	integrationTestImplementation("com.squareup.okhttp3:okhttp-tls")
 	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
@@ -147,7 +147,7 @@ val testOnlySecurityUpgrades = listOf(
 	"com.google.guava:guava:33.7.1-jre",
 	"com.jayway.jsonpath:json-path:2.9.0",
 	"commons-fileupload:commons-fileupload:1.6.0",
-	"commons-io:commons-io:2.20.0",
+	"commons-io:commons-io:2.22.0",
 	"net.minidev:json-smart:2.6.0",
 	"org.apache.commons:commons-lang3:3.20.0",
 	"org.apache.httpcomponents.client5:httpclient5:5.6.4",
