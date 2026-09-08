@@ -17,13 +17,11 @@ Dependency Updates:
   * Updates `org.eclipse.jetty` modules from 9.4.43.v20210629 to 9.4.58.v20250814
   * Updates `com.fasterxml.jackson.core` modules from 2.12.5 to 2.22.2
   * Updates `com.google.guava:guava` from 30.1.1-jre to 33.7.1-jre
-  * Updates `org.jetbrains.kotlin:kotlin-stdlib` from 1.4.0 to 1.9.10
   * Updates `commons-fileupload:commons-fileupload` from 1.4 to 1.6.0
   * Updates `org.apache.commons:commons-lang3` from 3.12.0 to 3.20.0
   * Updates `net.minidev:json-smart` from 2.4.7 to 2.6.0
   * Updates `com.jayway.jsonpath:json-path` from 2.6.0 to 2.9.0
   * Updates `com.github.jknack:handlebars` from 4.2.0 to 4.5.4
-  * Updates `com.squareup.okio:okio` from 2.8.0 to 3.6.0
   * Updates `org.xmlunit:xmlunit-core` from 2.8.2 to 2.13.0
 
 ## 0.2.0 (November 15, 2023)
