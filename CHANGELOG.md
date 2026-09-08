@@ -8,12 +8,12 @@ Features:
 
 Dependency Updates:
 
-* Bump `com.google.code.gson:gson` from 2.8.8 to 2.14.0 (fixes CVE-2022-25647) [GH-XX](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/XX)
-* Bump test-scope dependencies with 3 updates [GH-XX](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/XX)
+* Bump `com.google.code.gson:gson` from 2.8.8 to 2.14.0 (fixes CVE-2022-25647) [GH-44](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/44)
+* Bump test-scope dependencies with 3 updates [GH-44](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/44)
   * Updates `com.github.tomakehurst:wiremock-jre8` from 2.31.0 to 2.35.2
   * Updates `com.squareup.okhttp3:okhttp-bom` from 4.9.1 to 4.12.0
   * Updates `commons-io:commons-io` from 2.11.0 to 2.20.0
-* Constrain test-scope transitive dependencies to patched versions [GH-XX](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/XX)
+* Constrain test-scope transitive dependencies to patched versions [GH-44](https://github.com/hashicorp/vault-servicenow-credential-resolver/pull/44)
   * Updates `org.eclipse.jetty` modules from 9.4.43.v20210629 to 9.4.58.v20250814
   * Updates `com.fasterxml.jackson.core` modules from 2.12.5 to 2.22.2
   * Updates `com.google.guava:guava` from 30.1.1-jre to 33.7.1-jre
