@@ -101,7 +101,7 @@ dependencies {
 	} )
 
 	testImplementation("junit:junit:4.13.2")
-	testImplementation("com.github.tomakehurst:wiremock-jre8:2.35.2")
+	testImplementation("com.github.tomakehurst:wiremock-jre8:3.0.1")
 	testRuntimeOnly("org.slf4j:slf4j-nop:1.7.32")
 }
 
