@@ -102,7 +102,7 @@ dependencies {
 
 	testImplementation("junit:junit:4.13.2")
 	testImplementation("com.github.tomakehurst:wiremock-jre8:2.35.2")
-	testRuntimeOnly("org.slf4j:slf4j-nop:1.7.32")
+	testRuntimeOnly("org.slf4j:slf4j-nop:2.0.19")
 }
 
 // Integration test definition based on:
@@ -132,7 +132,7 @@ dependencies {
 	integrationTestImplementation("commons-io:commons-io:2.22.0")
 	integrationTestImplementation(platform("com.squareup.okhttp3:okhttp-bom:5.5.0"))
 	integrationTestImplementation("com.squareup.okhttp3:okhttp-tls")
-	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:1.7.31")
+	integrationTestRuntimeOnly("org.slf4j:slf4j-nop:2.0.19")
 }
 
 // Patched versions for libraries that reach the build only through WireMock and
