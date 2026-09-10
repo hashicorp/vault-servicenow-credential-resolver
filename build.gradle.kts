@@ -92,7 +92,7 @@ tasks.register<CopyMidJars>("copyMidJars") {
 
 dependencies {
 	implementation("com.google.code.gson:gson:2.14.0")
-	implementation("org.apache.httpcomponents:httpclient:4.5.13")
+	implementation("org.apache.httpcomponents:httpclient:4.5.14")
 
 	// lib/ folder requires mid.jar and commons-glide.jar to build
 	implementation(fileTree("build/mid") {
