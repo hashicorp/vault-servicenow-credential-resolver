@@ -145,7 +145,7 @@ val testOnlySecurityUpgrades = listOf(
 	"com.github.jknack:handlebars:4.5.4",
 	"com.github.jknack:handlebars-helpers:4.5.4",
 	"com.google.guava:guava:33.7.1-jre",
-	"com.jayway.jsonpath:json-path:2.9.0",
+	"com.jayway.jsonpath:json-path:3.0.0",
 	"commons-fileupload:commons-fileupload:1.6.0",
 	"commons-io:commons-io:2.22.0",
 	"net.minidev:json-smart:2.6.0",
